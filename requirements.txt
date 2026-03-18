@@ -1,8 +1,8 @@
 pandas
 plotly
-streamlit
 yfinance
 pandas-datareader
 prophet
 requests
 datetime
+streamlit>=1.32.0
