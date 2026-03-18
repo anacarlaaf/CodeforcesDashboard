@@ -100,9 +100,8 @@ def github_heatmap(df, title="Atividade"):
         showscale=False
     ))
 
-    # ⭐ SEGREDO DOS QUADRADOS
     fig.update_yaxes(
-        scaleanchor="x",   # trava proporção
+        scaleanchor="x",
         scaleratio=1
     )
 
@@ -119,7 +118,7 @@ def github_heatmap(df, title="Atividade"):
         )
     )
 
-    st.plotly_chart(fig, width="stretch")
+    st.plotly_chart(fig, use_container_width=True)
 
 
 # =============================
@@ -173,12 +172,11 @@ else:
         [today - datetime.timedelta(days=7), today]
     )
 
-    start = pd.to_datetime.datetime(date_range[0])
-    end = pd.to_datetime.datetime(date_range[1])
+    start = pd.to_datetime(date_range[0])
+    end = pd.to_datetime(date_range[1])
 
-# Converter para datetime.datetime (caso seja preset)
-start = pd.to_datetime.datetime(start)
-end = pd.to_datetime.datetime(end)
+start = pd.to_datetime(start)
+end = pd.to_datetime(end)
 
 if st.sidebar.button("🔄 Atualizar dados"):
     st.cache_data.clear()
@@ -189,17 +187,8 @@ if st.sidebar.button("🔄 Atualizar dados"):
 
 subs, rating, users = load_data(handles)
 
-# 📅 Converter timestamps → datetime.datetime
-subs["date"] = pd.to_datetime.datetime(subs["creationTimeSeconds"], unit="s")
-rating["date"] = pd.to_datetime.datetime(
-    rating["ratingUpdatetime.datetimeSeconds"], unit="s"
-)
-
-# 📅 Intervalo selecionado
-# Converter para datetime.datetime (caso seja preset)
-start = pd.to_datetime.datetime(start)
-end = pd.to_datetime.datetime(end)
-
+subs["date"] = pd.to_datetime(subs["creationTimeSeconds"], unit="s")
+rating["date"] = pd.to_datetime(rating["ratingUpdateTimeSeconds"], unit="s")
 
 # 🔎 Filtrar submissões
 subs = subs[(subs["date"] >= start) & (subs["date"] <= end)]
@@ -221,35 +210,36 @@ if mode == "Todos":
 
     st.header("👥 Visão de Todos")
 
+    # ✅ KPI da equipe
     col1, col2, col3, col4 = st.columns(4)
 
     col1.metric("👥 Usuários", users.shape[0])
     col2.metric("📩 Submissões", subs.shape[0])
     col3.metric("🧩 Problemas resolvidos", unique_solved.shape[0])
-    col4.metric("🏁 Contests", subs["contestId"].nunique())
+    col4.metric("🏁 Contests", rating["contestId"].nunique())  # corrigido
 
     # Ranking
     st.subheader("🏆 Ranking por Rating")
 
     # 🧩 Problemas resolvidos por usuário
     solved_count = (
-    unique_solved.groupby("handle")
-    .size()
-    .rename("problems_solved")
+        unique_solved.groupby("handle")
+        .size()
+        .rename("problems_solved")
     )
 
-    # 🏁 Contests oficiais por usuário
+    # 🏁 Contests oficiais por usuário (já filtrados pelo período)
     contest_count = (
-    rating.groupby("handle")
-    .size()
-    .rename("official_contests")
+        rating.groupby("handle")
+        .size()
+        .rename("official_contests")
     )
 
     # 🔗 Merge com users
     ranking = users.merge(
-    solved_count, on="handle", how="left"
+        solved_count, on="handle", how="left"
     ).merge(
-    contest_count, on="handle", how="left"
+        contest_count, on="handle", how="left"
     )
 
     # Preencher NaN com 0
@@ -258,22 +248,23 @@ if mode == "Todos":
 
     # Ordenar por rating
     ranking = ranking.sort_values("rating", ascending=False)[
-    [
-    "handle",
-    "rating",
-    "maxRating",
-    "rank",
-    "problems_solved",
-    "official_contests",
-    ]
+        [
+            "handle",
+            "rating",
+            "maxRating",
+            "rank",
+            "problems_solved",
+            "official_contests",
+        ]
     ]
 
+    # 🔥 Estilo das cores do rank
     styled = ranking.style.map(
-    cf_rank_color,
-    subset=["rank"]
+        cf_rank_color,
+        subset=["rank"]
     )
 
-    st.dataframe(styled, width="stretch")
+    st.dataframe(styled, use_container_width=True)
 
     # =============================
     # 🧩 PROBLEMAS RESOLVIDOS POR USUÁRIO (POR DIFICULDADE)
@@ -286,11 +277,9 @@ if mode == "Todos":
     if diff_df.empty:
         st.info("Sem dados de dificuldade no período.")
     else:
-
-        # 📊 Faixas de dificuldade Codeforces
         bins = [0, 800, 1200, 1600, 2000, 2400, 5000]
         labels = ["<800", "800–1200", "1200–1600",
-                "1600–2000", "2000–2400", "2400+"]
+                  "1600–2000", "2000–2400", "2400+"]
 
         diff_df["difficulty"] = pd.cut(
             diff_df["problem.rating"],
@@ -298,7 +287,6 @@ if mode == "Todos":
             labels=labels
         )
 
-        # 📊 Contagem por usuário e dificuldade
         pivot = (
             diff_df
             .groupby(["handle", "difficulty"])
@@ -306,7 +294,6 @@ if mode == "Todos":
             .unstack(fill_value=0)
         )
 
-        # 🎨 Cores semelhantes ao Codeforces
         colors = {
             "<800": "#AAAAAA",
             "800–1200": "#77FF77",
@@ -334,8 +321,7 @@ if mode == "Todos":
             height=500
         )
 
-        st.plotly_chart(fig, width="stretch")
-
+        st.plotly_chart(fig, use_container_width=True)
 
 # =============================
 # 👤 MODO INDIVIDUAL
@@ -345,7 +331,6 @@ else:
 
     st.header("👤 Visão Individual")
 
-    # 🔽 SELEÇÃO DO USUÁRIO (APENAS UMA VEZ)
     user = st.selectbox("Usuário", handles)
 
     u_subs = subs[subs["handle"] == user]
@@ -412,4 +397,5 @@ else:
             data=[go.Pie(labels=pie.index, values=pie.values)]
         )
 
-        st.plotly_chart(fig, width="stretch")
+
+        st.plotly_chart(fig, use_container_width=True)
