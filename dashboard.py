@@ -272,6 +272,7 @@ if mode == "Todos":
 
     st.subheader("🧩 Problemas resolvidos por usuário (por dificuldade)")
 
+    # Apenas submissões corretas (AC)
     diff_df = unique_solved.dropna(subset=["problem.rating"]).copy()
 
     if diff_df.empty:
@@ -279,7 +280,7 @@ if mode == "Todos":
     else:
         bins = [0, 800, 1200, 1600, 2000, 2400, 5000]
         labels = ["<800", "800–1200", "1200–1600",
-                  "1600–2000", "2000–2400", "2400+"]
+                "1600–2000", "2000–2400", "2400+"]
 
         diff_df["difficulty"] = pd.cut(
             diff_df["problem.rating"],
@@ -287,12 +288,19 @@ if mode == "Todos":
             labels=labels
         )
 
+        # Pivot para contar problemas por dificuldade
         pivot = (
             diff_df
             .groupby(["handle", "difficulty"])
             .size()
             .unstack(fill_value=0)
         )
+
+        # Garantir que todos os handles apareçam, mesmo sem submissões
+        for h in handles:
+            if h not in pivot.index:
+                pivot.loc[h] = 0
+        pivot = pivot.sort_index()  # opcional, para ordem alfabética
 
         colors = {
             "<800": "#AAAAAA",
