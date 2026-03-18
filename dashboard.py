@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
 import requests
-from datetime import datetime, timedelta
+import datetime
 
 st.set_page_config(layout="wide")
 
@@ -153,32 +153,32 @@ preset = st.sidebar.radio(
     ]
 )
 
-today = datetime.now()
+today = datetime.datetime.now()
 
 if preset == "Última semana":
-    start = today - timedelta(days=7)
+    start = today - datetime.timedelta(days=7)
     end = today
 
 elif preset == "Último mês":
-    start = today - timedelta(days=30)
+    start = today - datetime.timedelta(days=30)
     end = today
 
 elif preset == "Últimos 3 meses":
-    start = today - timedelta(days=90)
+    start = today - datetime.timedelta(days=90)
     end = today
 
 else:
     date_range = st.sidebar.date_input(
         "Escolha o intervalo",
-        [today - timedelta(days=7), today]
+        [today - datetime.timedelta(days=7), today]
     )
 
-    start = pd.to_datetime(date_range[0])
-    end = pd.to_datetime(date_range[1])
+    start = pd.to_datetime.datetime(date_range[0])
+    end = pd.to_datetime.datetime(date_range[1])
 
-# Converter para datetime (caso seja preset)
-start = pd.to_datetime(start)
-end = pd.to_datetime(end)
+# Converter para datetime.datetime (caso seja preset)
+start = pd.to_datetime.datetime(start)
+end = pd.to_datetime.datetime(end)
 
 if st.sidebar.button("🔄 Atualizar dados"):
     st.cache_data.clear()
@@ -189,16 +189,16 @@ if st.sidebar.button("🔄 Atualizar dados"):
 
 subs, rating, users = load_data(handles)
 
-# 📅 Converter timestamps → datetime
-subs["date"] = pd.to_datetime(subs["creationTimeSeconds"], unit="s")
-rating["date"] = pd.to_datetime(
-    rating["ratingUpdateTimeSeconds"], unit="s"
+# 📅 Converter timestamps → datetime.datetime
+subs["date"] = pd.to_datetime.datetime(subs["creationTimeSeconds"], unit="s")
+rating["date"] = pd.to_datetime.datetime(
+    rating["ratingUpdatetime.datetimeSeconds"], unit="s"
 )
 
 # 📅 Intervalo selecionado
-# Converter para datetime (caso seja preset)
-start = pd.to_datetime(start)
-end = pd.to_datetime(end)
+# Converter para datetime.datetime (caso seja preset)
+start = pd.to_datetime.datetime(start)
+end = pd.to_datetime.datetime(end)
 
 
 # 🔎 Filtrar submissões

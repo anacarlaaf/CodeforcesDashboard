@@ -1,0 +1,8 @@
+pandas
+plotly
+streamlit
+yfinance
+pandas-datareader
+prophet
+requests
+datetime
