@@ -407,3 +407,43 @@ else:
 
 
         st.plotly_chart(fig, use_container_width=True)
+
+    # =============================
+    # 🏷️ TIPOS DE PROBLEMAS RESOLVIDOS
+    # =============================
+
+    st.subheader("🏷️ Tipos de problemas resolvidos")
+
+    user_tags_df = u_solved.dropna(subset=["problem.tags"]).copy()
+
+    if user_tags_df.empty:
+        st.info("Sem dados de tags no período.")
+    else:
+        tag_rows = []
+        for _, row in user_tags_df.iterrows():
+            tags = row["problem.tags"]
+            if isinstance(tags, list):
+                for tag in tags:
+                    tag_rows.append({"tag": tag})
+
+        user_tags_exploded = pd.DataFrame(tag_rows)
+
+        if user_tags_exploded.empty:
+            st.info("Sem dados de tags no período.")
+        else:
+            tag_counts = user_tags_exploded["tag"].value_counts()
+            tag_pct = (tag_counts / tag_counts.sum() * 100).round(1)
+
+            fig_tags = go.Figure(
+                data=[go.Pie(labels=tag_pct.index, values=tag_pct.values, textinfo="label+percent")]
+            )
+
+            fig_tags.update_layout(height=500)
+
+            st.plotly_chart(fig_tags, use_container_width=True)
+
+            st.dataframe(
+                pd.DataFrame({"Tag": tag_counts.index, "Questões": tag_counts.values})
+                .reset_index(drop=True),
+                use_container_width=True,
+            )
