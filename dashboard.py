@@ -272,12 +272,27 @@ if mode == "Todos":
 
     st.subheader("🧩 Problemas resolvidos por usuário (por dificuldade)")
 
-    # Apenas submissões corretas (AC)
-    diff_df = unique_solved.dropna(subset=["problem.rating"]).copy()
+    # --- Identificar problemas Gym ---
+    unique_solved["is_gym"] = unique_solved["problem.contestId"] >= 100000
 
-    if diff_df.empty:
-        st.info("Sem dados de dificuldade no período.")
+    # --- Separar dados ---
+    # Não-gym com rating
+    diff_df = unique_solved[
+        (~unique_solved["is_gym"]) &
+        (~unique_solved["problem.rating"].isna())
+    ].copy()
+
+    # Apenas gym
+    gym_df = unique_solved[unique_solved["is_gym"]].copy()
+
+    if diff_df.empty and gym_df.empty:
+        st.info("Sem dados no período.")
     else:
+
+        # =============================
+        # 🎯 FAIXAS DE DIFICULDADE
+        # =============================
+
         bins = [0, 800, 1200, 1600, 2000, 2400, 5000]
         labels = ["<800", "800–1200", "1200–1600",
                 "1600–2000", "2000–2400", "2400+"]
@@ -288,7 +303,7 @@ if mode == "Todos":
             labels=labels
         )
 
-        # Pivot para contar problemas por dificuldade
+        # Pivot: problemas por usuário por dificuldade
         pivot = (
             diff_df
             .groupby(["handle", "difficulty"])
@@ -296,11 +311,24 @@ if mode == "Todos":
             .unstack(fill_value=0)
         )
 
-        # Garantir que todos os handles apareçam, mesmo sem submissões
+        # Garantir todos os handles
         for h in handles:
             if h not in pivot.index:
                 pivot.loc[h] = 0
-        pivot = pivot.sort_index()  # opcional, para ordem alfabética
+
+        pivot = pivot.sort_index()
+
+        # =============================
+        # 🏋️ CONTAGEM DE GYM
+        # =============================
+
+        gym_counts = gym_df.groupby("handle").size()
+        gym_counts = gym_counts.reindex(handles, fill_value=0)
+        gym_counts = gym_counts.sort_index()
+
+        # =============================
+        # 🎨 CORES
+        # =============================
 
         colors = {
             "<800": "#AAAAAA",
@@ -311,16 +339,35 @@ if mode == "Todos":
             "2400+": "#FF7777",
         }
 
+        # =============================
+        # 📊 GRÁFICO
+        # =============================
+
         fig = go.Figure()
 
+        # Barras por dificuldade
         for diff in labels:
             if diff in pivot.columns:
                 fig.add_bar(
                     x=pivot.index,
                     y=pivot[diff],
                     name=diff,
-                    marker_color=colors.get(diff, None)
+                    marker_color=colors.get(diff)
                 )
+
+        # Barra Gym (branca + textura cinza)
+        fig.add_bar(
+            x=gym_counts.index,
+            y=gym_counts.values,
+            name="gym",
+            marker=dict(
+                color="white",
+                pattern=dict(
+                    shape="/",
+                    fgcolor="gray"
+                )
+            )
+        )
 
         fig.update_layout(
             barmode="stack",
