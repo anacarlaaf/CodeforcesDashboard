@@ -437,7 +437,7 @@ else:
 
     bins = [0, 800, 1200, 1600, 2000, 2400, 5000]
     labels = ["<800", "800–1200", "1200–1600",
-              "1600–2000", "2000–2400", "2400+"]
+            "1600–2000", "2000–2400", "2400+"]
 
     diff = u_solved.dropna(subset=["problem.rating"])
 
@@ -448,10 +448,26 @@ else:
 
         pie = diff["difficulty"].value_counts()
 
-        fig = go.Figure(
-            data=[go.Pie(labels=pie.index, values=pie.values)]
-        )
+        # 🎨 SUAS CORES
+        colors = {
+            "<800": "#AAAAAA",
+            "800–1200": "#77FF77",
+            "1200–1600": "#77DDBB",
+            "1600–2000": "#7777FF",
+            "2000–2400": "#AA77FF",
+            "2400+": "#FF7777",
+        }
 
+        # ✅ Lista de cores na ordem do pie
+        pie_colors = [colors.get(label, "#CCCCCC") for label in pie.index]
+
+        fig = go.Figure(
+            data=[go.Pie(
+                labels=pie.index,
+                values=pie.values,
+                marker=dict(colors=pie_colors)
+            )]
+        )
 
         st.plotly_chart(fig, use_container_width=True)
 
