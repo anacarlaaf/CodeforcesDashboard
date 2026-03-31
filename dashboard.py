@@ -6,8 +6,17 @@ import datetime
 
 st.set_page_config(layout="wide")
 
+colors_problems = {
+    "<800": "#AAAAAA",
+    "800–1200": "#77FF77",
+    "1200–1600": "#77DDBB",
+    "1600–2000": "#7777FF",
+    "2000–2400": "#AA77FF",
+    "2400+": "#FF7777",
+}
+
 # =============================
-# 🔧 API
+# API
 # =============================
 
 BASE = "https://codeforces.com/api/"
@@ -61,68 +70,8 @@ def cf_rank_color(rank):
         return f"color: {colors.get(rank.lower(), 'black')}; font-weight: bold;"
     return ""
 
-
 # =============================
-# 🔥 FUNÇÃO HEATMAP GITHUB
-# =============================
-def github_heatmap(df, title="Atividade"):
-
-    if df.empty:
-        st.info("Sem dados no período.")
-        return
-
-    daily = (
-        df.groupby(df["date"].dt.date)
-        .size()
-        .rename("count")
-        .to_frame()
-    )
-
-    full_range = pd.date_range(
-        daily.index.min(), daily.index.max(), freq="D"
-    )
-
-    daily = daily.reindex(full_range, fill_value=0)
-
-    heatmap_df = pd.DataFrame({
-        "date": daily.index,
-        "count": daily["count"].values
-    })
-
-    heatmap_df["weekday"] = heatmap_df["date"].dt.weekday
-    heatmap_df["week"] = heatmap_df["date"].dt.isocalendar().week
-
-    fig = go.Figure(data=go.Heatmap(
-        x=heatmap_df["week"],
-        y=heatmap_df["weekday"],
-        z=heatmap_df["count"],
-        colorscale="Greens",
-        showscale=False
-    ))
-
-    fig.update_yaxes(
-        scaleanchor="x",
-        scaleratio=1
-    )
-
-    fig.update_layout(
-        title=title,
-        height=300,
-        margin=dict(l=0, r=0, t=40, b=0),
-        xaxis=dict(showgrid=False),
-        yaxis=dict(
-            showgrid=False,
-            tickmode="array",
-            tickvals=[0,1,2,3,4,5,6],
-            ticktext=["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"]
-        )
-    )
-
-    st.plotly_chart(fig, use_container_width=True)
-
-
-# =============================
-# 🎛️ SIDEBAR
+# SIDEBAR
 # =============================
 
 st.title("📊 Codeforces")
@@ -137,7 +86,7 @@ handles = [h.strip() for h in handles_input.split(",") if h.strip()]
 mode = st.sidebar.radio("Modo", ["Todos", "Individual"])
 
 # =============================
-# 📅 INTERVALO DE DATAS
+# INTERVALO DE DATAS
 # =============================
 
 st.sidebar.subheader("📅 Intervalo")
@@ -182,7 +131,7 @@ if st.sidebar.button("🔄 Atualizar dados"):
     st.cache_data.clear()
 
 # =============================
-# 📥 CARREGAR DADOS
+# CARREGAR DADOS
 # =============================
 
 subs, rating, users = load_data(handles)
@@ -190,27 +139,27 @@ subs, rating, users = load_data(handles)
 subs["date"] = pd.to_datetime(subs["creationTimeSeconds"], unit="s")
 rating["date"] = pd.to_datetime(rating["ratingUpdateTimeSeconds"], unit="s")
 
-# 🔎 Filtrar submissões
+# Filtrar submissões
 subs = subs[(subs["date"] >= start) & (subs["date"] <= end)]
 
-# 🔎 Filtrar contests oficiais pelo mesmo período
+# Filtrar contests oficiais pelo mesmo período
 rating = rating[(rating["date"] >= start) & (rating["date"] <= end)]
 
 solved = subs[subs["verdict"] == "OK"]
 
 unique_solved = solved.drop_duplicates(
     ["handle", "problem.contestId", "problem.index"]
-)
+).copy()
 
 # =============================
-# 👥 MODO TODOS
+# MODO TODOS
 # =============================
 
 if mode == "Todos":
 
     st.header("👥 Visão de Todos")
 
-    # ✅ KPI da equipe
+    # KPI
     col1, col2, col3, col4 = st.columns(4)
 
     col1.metric("👥 Usuários", users.shape[0])
@@ -228,14 +177,14 @@ if mode == "Todos":
         .rename("problems_solved")
     )
 
-    # 🏁 Contests oficiais por usuário (já filtrados pelo período)
+    # Contests oficiais por usuário
     contest_count = (
         rating.groupby("handle")
         .size()
         .rename("official_contests")
     )
 
-    # 🔗 Merge com users
+    # Merge com users
     ranking = users.merge(
         solved_count, on="handle", how="left"
     ).merge(
@@ -258,23 +207,31 @@ if mode == "Todos":
         ]
     ]
 
-    # 🔥 Estilo das cores do rank
+    ranking = ranking.rename(columns={
+        "handle": "Handle",
+        "rating": "Rating",
+        "maxRating": "Rating Máximo",
+        "rank": "Rank",
+        "problems_solved": "Problemas Resolvidos",
+        "official_contests": "Contests Oficiais"
+    })
+
     styled = ranking.style.map(
         cf_rank_color,
-        subset=["rank"]
+        subset=["Rank"]
     )
 
-    st.dataframe(styled, use_container_width=True)
+    st.dataframe(styled, width="stretch")
 
-    # =============================
-    # 🧩 PROBLEMAS RESOLVIDOS POR USUÁRIO (POR DIFICULDADE)
-    # =============================
+    # ======================================================
+    # PROBLEMAS RESOLVIDOS POR USUÁRIO (POR DIFICULDADE)
+    # ======================================================
 
     st.subheader("🧩 Problemas resolvidos por usuário (por dificuldade)")
 
     # --- Identificar problemas Gym ---
-    unique_solved["is_gym"] = unique_solved["problem.contestId"] >= 100000
-
+    unique_solved.loc[:, "is_gym"] = unique_solved["problem.contestId"] >= 100000
+    
     # --- Separar dados ---
     # Não-gym com rating
     diff_df = unique_solved[
@@ -290,7 +247,7 @@ if mode == "Todos":
     else:
 
         # =============================
-        # 🎯 FAIXAS DE DIFICULDADE
+        # FAIXAS DE DIFICULDADE
         # =============================
 
         bins = [0, 800, 1200, 1600, 2000, 2400, 5000]
@@ -306,7 +263,7 @@ if mode == "Todos":
         # Pivot: problemas por usuário por dificuldade
         pivot = (
             diff_df
-            .groupby(["handle", "difficulty"])
+            .groupby(["handle", "difficulty"], observed=False)
             .size()
             .unstack(fill_value=0)
         )
@@ -319,7 +276,7 @@ if mode == "Todos":
         pivot = pivot.sort_index()
 
         # =============================
-        # 🏋️ CONTAGEM DE GYM
+        # CONTAGEM DE GYM
         # =============================
 
         gym_counts = gym_df.groupby("handle").size()
@@ -327,20 +284,7 @@ if mode == "Todos":
         gym_counts = gym_counts.sort_index()
 
         # =============================
-        # 🎨 CORES
-        # =============================
-
-        colors = {
-            "<800": "#AAAAAA",
-            "800–1200": "#77FF77",
-            "1200–1600": "#77DDBB",
-            "1600–2000": "#7777FF",
-            "2000–2400": "#AA77FF",
-            "2400+": "#FF7777",
-        }
-
-        # =============================
-        # 📊 GRÁFICO
+        # GRÁFICO
         # =============================
 
         fig = go.Figure()
@@ -352,7 +296,7 @@ if mode == "Todos":
                     x=pivot.index,
                     y=pivot[diff],
                     name=diff,
-                    marker_color=colors.get(diff)
+                    marker_color=colors_problems.get(diff)
                 )
 
         # Barra Gym (branca + textura cinza)
@@ -376,10 +320,10 @@ if mode == "Todos":
             height=500
         )
 
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width='stretch')
 
 # =============================
-# 👤 MODO INDIVIDUAL
+# MODO INDIVIDUAL
 # =============================
 
 else:
@@ -395,7 +339,7 @@ else:
     info = users[users["handle"] == user].iloc[0]
 
     # =============================
-    # 🔗 LINK PARA O PERFIL
+    # LINK PARA O PERFIL
     # =============================
 
     profile_url = f"https://codeforces.com/profile/{user}"
@@ -422,7 +366,7 @@ else:
     )
 
     # =============================
-    # 📊 KPIs
+    # KPIs
     # =============================
 
     col1, col2, col3, col4 = st.columns(4)
@@ -448,18 +392,8 @@ else:
 
         pie = diff["difficulty"].value_counts()
 
-        # 🎨 SUAS CORES
-        colors = {
-            "<800": "#AAAAAA",
-            "800–1200": "#77FF77",
-            "1200–1600": "#77DDBB",
-            "1600–2000": "#7777FF",
-            "2000–2400": "#AA77FF",
-            "2400+": "#FF7777",
-        }
-
-        # ✅ Lista de cores na ordem do pie
-        pie_colors = [colors.get(label, "#CCCCCC") for label in pie.index]
+        # Lista de cores na ordem do pie
+        pie_colors = [colors_problems.get(label, "#CCCCCC") for label in pie.index]
 
         fig = go.Figure(
             data=[go.Pie(
@@ -472,7 +406,7 @@ else:
         st.plotly_chart(fig, use_container_width=True)
 
     # =============================
-    # 🏷️ TIPOS DE PROBLEMAS RESOLVIDOS
+    # TIPOS DE PROBLEMAS RESOLVIDOS
     # =============================
 
     st.subheader("🏷️ Tipos de problemas resolvidos")
@@ -510,3 +444,9 @@ else:
                 .reset_index(drop=True),
                 use_container_width=True,
             )
+
+# =============================
+# MODO EQUIPE
+# =============================
+
+# em construção...
