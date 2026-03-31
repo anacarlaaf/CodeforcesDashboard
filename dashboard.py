@@ -206,15 +206,19 @@ if mode == "Todos":
     ranking["problems_solved"] = ranking["problems_solved"].fillna(0).astype(int)
     ranking["official_contests"] = ranking["official_contests"].fillna(0).astype(int)
 
-    total_days = (end - start).days + 1
+    total_days = (end - start).days
     total_months = total_days // 30
-    target_contests = max(1, int(total_months * 2))
-    
-    ranking["meta_problems"] = ranking["problems_solved"].apply(
-        lambda x: progress_bar_scaled(x, total_days)
+    target_contests = max(2, int(total_months * 2))
+
+    max_digits_problems = len(str(ranking["problems_solved"].max()))
+    max_digits_contests = len(str(target_contests))
+
+    ranking["problems"] = ranking["problems_solved"].apply(
+        lambda x: f"{str(x).rjust(max_digits_problems, "\u2007")}/{total_days}  {progress_bar_scaled(x, total_days)}"
     )
-    ranking["meta_contests"] = ranking["official_contests"].apply(
-        lambda x: progress_bar_scaled(x, target_contests)
+
+    ranking["contests"] = ranking["official_contests"].apply(
+        lambda x: f"{str(x).rjust(max_digits_contests, "\u2007")}/{target_contests}  {progress_bar_scaled(x, target_contests, 2)}"
     )
 
     # Ordenar por rating
@@ -224,10 +228,10 @@ if mode == "Todos":
             "rating",
             "maxRating",
             "rank",
-            "problems_solved",
-            "meta_problems",
-            "official_contests",
-            "meta_contests",
+            #"problems_solved",
+            "problems",
+            #"official_contests",
+            "contests",
         ]
     ]
 
@@ -237,10 +241,10 @@ if mode == "Todos":
         "rating": "Rating",
         "maxRating": "Max Rating",
         "rank": "Rank",
-        "problems_solved": "Problemas",
-        "official_contests": "Contests",
-        "meta_problems": "Meta Problems",
-        "meta_contests": "Meta Contests"
+        #"problems_solved": "Problemas",
+        #"official_contests": "Contests",
+        "problems": "Problems",
+        "contests": "Contests"
     })
 
     styled = ranking.style.map(
