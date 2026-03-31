@@ -109,7 +109,7 @@ preset = st.sidebar.radio(
     ]
 )
 
-today = datetime.datetime.now()
+today = datetime.datetime.now(datetime.timezone.utc)
 
 if preset == "Última semana":
     start = today - datetime.timedelta(days=7)
@@ -129,11 +129,10 @@ else:
         [today - datetime.timedelta(days=7), today]
     )
 
-    start = pd.to_datetime(date_range[0])
-    end = pd.to_datetime(date_range[1])
+    start = pd.to_datetime(date_range[0], utc=True)
+    end = pd.to_datetime(date_range[1], utc=True)
+    end = end + pd.Timedelta(days=1) - pd.Timedelta(seconds=1)
 
-start = pd.to_datetime(start)
-end = pd.to_datetime(end)
 
 if st.sidebar.button("🔄 Atualizar dados"):
     st.cache_data.clear()
@@ -144,8 +143,8 @@ if st.sidebar.button("🔄 Atualizar dados"):
 
 subs, rating, users = load_data(handles)
 
-subs["date"] = pd.to_datetime(subs["creationTimeSeconds"], unit="s")
-rating["date"] = pd.to_datetime(rating["ratingUpdateTimeSeconds"], unit="s")
+subs["date"] = pd.to_datetime(subs["creationTimeSeconds"], unit="s", utc=True)
+rating["date"] = pd.to_datetime(rating["ratingUpdateTimeSeconds"], unit="s", utc=True)
 
 # Filtrar submissões
 subs = subs[(subs["date"] >= start) & (subs["date"] <= end)]
@@ -208,9 +207,14 @@ if mode == "Todos":
     ranking["official_contests"] = ranking["official_contests"].fillna(0).astype(int)
 
     total_days = (end - start).days + 1
-
-    ranking["progress"] = ranking["problems_solved"].apply(
+    total_months = total_days // 30
+    target_contests = max(1, int(total_months * 2))
+    
+    ranking["meta_problems"] = ranking["problems_solved"].apply(
         lambda x: progress_bar_scaled(x, total_days)
+    )
+    ranking["meta_contests"] = ranking["official_contests"].apply(
+        lambda x: progress_bar_scaled(x, target_contests)
     )
 
     # Ordenar por rating
@@ -221,8 +225,9 @@ if mode == "Todos":
             "maxRating",
             "rank",
             "problems_solved",
+            "meta_problems",
             "official_contests",
-            "progress",  # 👈 adicionada aqui
+            "meta_contests",
         ]
     ]
 
@@ -234,7 +239,8 @@ if mode == "Todos":
         "rank": "Rank",
         "problems_solved": "Problemas",
         "official_contests": "Contests",
-        "progress": "Meta"
+        "meta_problems": "Meta Problems",
+        "meta_contests": "Meta Contests"
     })
 
     styled = ranking.style.map(
@@ -424,7 +430,7 @@ else:
             )]
         )
 
-        st.plotly_chart(fig, width='streatch')
+        st.plotly_chart(fig, width='stretch')
 
     # =============================
     # TIPOS DE PROBLEMAS RESOLVIDOS
@@ -458,12 +464,12 @@ else:
 
             fig_tags.update_layout(height=500)
 
-            st.plotly_chart(fig_tags, width='streatch')
+            st.plotly_chart(fig_tags, width='stretch')
 
             st.dataframe(
                 pd.DataFrame({"Tag": tag_counts.index, "Questões": tag_counts.values})
                 .reset_index(drop=True),
-                width='streatch',
+                width='stretch',
             )
 
 # =============================
