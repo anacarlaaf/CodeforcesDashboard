@@ -70,6 +70,14 @@ def cf_rank_color(rank):
         return f"color: {colors.get(rank.lower(), 'black')}; font-weight: bold;"
     return ""
 
+
+def progress_bar_scaled(done, total, size=7):
+    if total == 0:
+        return ""
+    ratio = min(done / total, 1)
+    filled = int(ratio * size)
+    return "🟩" * filled + "🟥" * (size - filled)
+
 # =============================
 # SIDEBAR
 # =============================
@@ -155,6 +163,10 @@ unique_solved = solved.drop_duplicates(
 # MODO TODOS
 # =============================
 
+def progress_bar(done, total):
+    done = min(done, total)
+    return "🟩" * done + "🟥" * (total - done)
+
 if mode == "Todos":
 
     st.header("👥 Visão de Todos")
@@ -170,7 +182,7 @@ if mode == "Todos":
     # Ranking
     st.subheader("🏆 Ranking por Rating")
 
-    # 🧩 Problemas resolvidos por usuário
+    # Problemas resolvidos por usuário
     solved_count = (
         unique_solved.groupby("handle")
         .size()
@@ -195,6 +207,12 @@ if mode == "Todos":
     ranking["problems_solved"] = ranking["problems_solved"].fillna(0).astype(int)
     ranking["official_contests"] = ranking["official_contests"].fillna(0).astype(int)
 
+    total_days = (end - start).days + 1
+
+    ranking["progress"] = ranking["problems_solved"].apply(
+        lambda x: progress_bar_scaled(x, total_days)
+    )
+
     # Ordenar por rating
     ranking = ranking.sort_values("rating", ascending=False)[
         [
@@ -204,16 +222,19 @@ if mode == "Todos":
             "rank",
             "problems_solved",
             "official_contests",
+            "progress",  # 👈 adicionada aqui
         ]
     ]
 
+    # Renomear para exibição
     ranking = ranking.rename(columns={
         "handle": "Handle",
         "rating": "Rating",
-        "maxRating": "Rating Máximo",
+        "maxRating": "Max Rating",
         "rank": "Rank",
-        "problems_solved": "Problemas Resolvidos",
-        "official_contests": "Contests Oficiais"
+        "problems_solved": "Problemas",
+        "official_contests": "Contests",
+        "progress": "Meta"
     })
 
     styled = ranking.style.map(
@@ -403,7 +424,7 @@ else:
             )]
         )
 
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width='streatch')
 
     # =============================
     # TIPOS DE PROBLEMAS RESOLVIDOS
@@ -437,12 +458,12 @@ else:
 
             fig_tags.update_layout(height=500)
 
-            st.plotly_chart(fig_tags, use_container_width=True)
+            st.plotly_chart(fig_tags, width='streatch')
 
             st.dataframe(
                 pd.DataFrame({"Tag": tag_counts.index, "Questões": tag_counts.values})
                 .reset_index(drop=True),
-                use_container_width=True,
+                width='streatch',
             )
 
 # =============================
