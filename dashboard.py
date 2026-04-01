@@ -86,12 +86,15 @@ st.title("📊 Codeforces")
 
 handles_input = st.sidebar.text_input(
     "Handles (separados por vírgula)",
-    "anacarlaaf,luanzito,rebecamadi,lip33"
+    "anacarlaaf,luanzito,rebecamadi,lip33, nathan0603"
 )
 
 handles = [h.strip() for h in handles_input.split(",") if h.strip()]
 
-mode = st.sidebar.radio("Modo", ["Todos", "Individual"])
+mode = st.sidebar.radio("Modo", ["Todos", "Individual", "Equipe"])
+
+team_default = handles[:3] if len(handles) >= 3 else handles + ["", "", ""]
+team_default = team_default[:3]
 
 # =============================
 # INTERVALO DE DATAS
@@ -357,7 +360,7 @@ if mode == "Todos":
 # MODO INDIVIDUAL
 # =============================
 
-else:
+elif mode == "Individual":
 
     st.header("👤 Visão Individual")
 
@@ -477,7 +480,23 @@ else:
             )
 
 # =============================
-# MODO EQUIPE
+# MODO TIME
 # =============================
 
-# em construção...
+else:
+    st.sidebar.subheader("👥 Time (até 3 usuários)")
+
+    team_handles = []
+    for i in range(3):
+        h = st.sidebar.text_input(
+            f"Handle {i+1}",
+            value=team_default[i],
+            key=f"team_{i}"
+        )
+        if h.strip():
+            team_handles.append(h.strip())
+
+    # evitar vazio
+    if not team_handles:
+        st.warning("Adicione pelo menos um handle no time.")
+        st.stop()
