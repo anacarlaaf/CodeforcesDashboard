@@ -537,6 +537,9 @@ else:
         contest_count, on="handle", how="left"
     )
 
+    ranking["rating"] = ranking["rating"].fillna(0).astype(int)
+    ranking["maxRating"] = ranking["maxRating"].fillna(0).astype(int)
+
     # Garantir que todos os handles apareçam
     ranking = ranking.set_index("handle").reindex(team_handles).reset_index()
 
