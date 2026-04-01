@@ -204,6 +204,9 @@ if mode == "Todos":
     ).merge(
         contest_count, on="handle", how="left"
     )
+    
+    ranking["rating"] = ranking["rating"].fillna(0).astype(int)
+    ranking["maxRating"] = ranking["maxRating"].fillna(0).astype(int)
 
     # Preencher NaN com 0
     ranking["problems_solved"] = ranking["problems_solved"].fillna(0).astype(int)
