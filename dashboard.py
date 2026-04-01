@@ -486,17 +486,25 @@ elif mode == "Individual":
 # =============================
 
 else:
-    st.sidebar.subheader("👥 Time (até 3 usuários)")
+    st.header("👥 Visão de Time")
 
-    team_handles = []
+    st.subheader("👤 Seleção do Time")
+
+    col1, col2, col3 = st.columns(3)
+
+    inputs = []
+    cols = [col1, col2, col3]
+
     for i in range(3):
-        h = st.sidebar.text_input(
-            f"Handle {i+1}",
-            value=team_default[i],
-            key=f"team_{i}"
-        )
-        if h.strip():
-            team_handles.append(h.strip())
+        with cols[i]:
+            h = st.text_input(
+                f"Handle {i+1}",
+                value=team_default[i],
+                key=f"team_{i}"
+            )
+            inputs.append(h)
+
+    team_handles = [h.strip() for h in inputs if h.strip()]
 
     # evitar vazio
     if not team_handles:
