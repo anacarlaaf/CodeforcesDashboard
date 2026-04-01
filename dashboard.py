@@ -91,10 +91,9 @@ handles_input = st.sidebar.text_input(
 
 handles = [h.strip() for h in handles_input.split(",") if h.strip()]
 
-mode = st.sidebar.radio("Modo", ["Todos", "Individual", "Equipe"])
+mode = st.sidebar.radio("Modo", ["Todos", "Individual", "Time"])
 
-team_default = handles[:3] if len(handles) >= 3 else handles + ["", "", ""]
-team_default = team_default[:3]
+team_default = ["luanzito", "rebecamadi", "lip33"] if len(handles) >= 3 else handles + ["", "", ""]
 
 # =============================
 # INTERVALO DE DATAS
@@ -204,7 +203,7 @@ if mode == "Todos":
     ).merge(
         contest_count, on="handle", how="left"
     )
-    
+
     ranking["rating"] = ranking["rating"].fillna(0).astype(int)
     ranking["maxRating"] = ranking["maxRating"].fillna(0).astype(int)
 
@@ -503,3 +502,132 @@ else:
     if not team_handles:
         st.warning("Adicione pelo menos um handle no time.")
         st.stop()
+
+    # =============================
+    # FILTRO DO TIME
+    # =============================
+
+    team_users = users[users["handle"].isin(team_handles)]
+    team_rating = rating[rating["handle"].isin(team_handles)]
+    team_solved = unique_solved[unique_solved["handle"].isin(team_handles)]
+
+    # =============================
+    # TABELA
+    # =============================
+
+    st.subheader("🏆 Ranking do Time")
+
+    # Problemas resolvidos por usuário
+    solved_count = (
+        team_solved.groupby("handle")
+        .size()
+        .rename("problems_solved")
+    )
+
+    # Contests oficiais por usuário
+    contest_count = (
+        team_rating.groupby("handle")
+        .size()
+        .rename("official_contests")
+    )
+
+    ranking = team_users.merge(
+        solved_count, on="handle", how="left"
+    ).merge(
+        contest_count, on="handle", how="left"
+    )
+
+    # Garantir que todos os handles apareçam
+    ranking = ranking.set_index("handle").reindex(team_handles).reset_index()
+
+    ranking["problems_solved"] = ranking["problems_solved"].fillna(0).astype(int)
+    ranking["official_contests"] = ranking["official_contests"].fillna(0).astype(int)
+
+    total_days = (end - start).days
+    total_months = total_days // 30
+    target_contests = max(2, int(total_months * 2))
+
+    max_digits_problems = len(str(ranking["problems_solved"].max()))
+    max_digits_contests = len(str(target_contests))
+
+    ranking["problems"] = ranking["problems_solved"].apply(
+        lambda x: f"{str(x).rjust(max_digits_problems, '\u2007')}/{total_days}  {progress_bar_scaled(x, total_days)}"
+    )
+
+    ranking["contests"] = ranking["official_contests"].apply(
+        lambda x: f"{str(x).rjust(max_digits_contests, '\u2007')}/{target_contests}  {progress_bar_scaled(x, target_contests, 2)}"
+    )
+
+    ranking = ranking.sort_values("rating", ascending=False)[
+        [
+            "handle",
+            "rating",
+            "maxRating",
+            "rank",
+            "problems",
+            "contests",
+        ]
+    ]
+
+    ranking = ranking.rename(columns={
+        "handle": "Handle",
+        "rating": "Rating",
+        "maxRating": "Max Rating",
+        "rank": "Rank",
+        "problems": "Problems",
+        "contests": "Contests"
+    })
+
+    styled = ranking.style.map(
+        cf_rank_color,
+        subset=["Rank"]
+    )
+
+    st.dataframe(styled, width="stretch")
+
+    # =============================
+    # TAGS (AGREGADO DO TIME)
+    # =============================
+
+    st.subheader("🏷️ Tipos de problemas resolvidos")
+
+    user_tags_df = team_solved.dropna(subset=["problem.tags"]).copy()
+
+    if user_tags_df.empty:
+        st.info("Sem dados no período.")
+    else:
+        tag_rows = []
+
+        for _, row in user_tags_df.iterrows():
+            tags = row["problem.tags"]
+            if isinstance(tags, list):
+                for tag in tags:
+                    tag_rows.append({"tag": tag})
+
+        tags_df = pd.DataFrame(tag_rows)
+
+        if tags_df.empty:
+            st.info("Sem dados no período.")
+        else:
+            tag_counts = tags_df["tag"].value_counts()
+            tag_pct = (tag_counts / tag_counts.sum() * 100).round(1)
+
+            fig = go.Figure(
+                data=[go.Pie(
+                    labels=tag_pct.index,
+                    values=tag_pct.values,
+                    textinfo="label+percent"
+                )]
+            )
+
+            fig.update_layout(height=500)
+
+            st.plotly_chart(fig, width='stretch')
+
+            st.dataframe(
+                pd.DataFrame({
+                    "Tag": tag_counts.index,
+                    "Questões": tag_counts.values
+                }).reset_index(drop=True),
+                width="stretch"
+            )
