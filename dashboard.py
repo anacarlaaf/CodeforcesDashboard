@@ -98,7 +98,7 @@ def progress_bar_scaled(done, total, size=7):
 st.title("📊 Codeforces")
 
 handles_input = st.sidebar.text_input(
-    "Handles (separados por vírgula)",
+    "Handles",
     "anacarlaaf,luanzito,rebecamadi,lip33, nathan0603"
 )
 
