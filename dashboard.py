@@ -266,8 +266,10 @@ if mode == "Todos":
     st.subheader("🧩 Problemas resolvidos por usuário (por dificuldade)")
 
     # --- Identificar problemas Gym ---
-    unique_solved.loc[:, "is_gym"] = unique_solved["problem.contestId"] >= 100000
-    
+    unique_solved["is_gym"] = (
+        unique_solved["problem.rating"].isna() |
+        (unique_solved["problem.rating"] >= 100000)
+    )    
     # --- Separar dados ---
     # Não-gym com rating
     diff_df = unique_solved[
@@ -339,7 +341,7 @@ if mode == "Todos":
         fig.add_bar(
             x=gym_counts.index,
             y=gym_counts.values,
-            name="gym",
+            name="gym/unrated",
             marker=dict(
                 color="white",
                 pattern=dict(
