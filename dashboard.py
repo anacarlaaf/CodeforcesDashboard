@@ -4,7 +4,20 @@ import plotly.graph_objects as go
 import requests
 import datetime
 
-st.set_page_config(layout="wide")
+st.set_page_config(
+    layout="wide",
+    page_title="ICOMP | CP Dashboard",
+    page_icon="📊"
+)
+
+tag_colors= [
+    "#1f77b4", "#8ecae6", "#ff2d2d", "#ff9896",
+    "#2a9d8f", "#6ede8a", "#f77f00", "#f4a261",
+    "#6a4c93", "#adb5bd",
+    "#339af0", "#1d3557", "#f08080", "#2d6a4f",
+    "#74c69d", "#52b788", "#e76f51", "#457b9d",
+    "#a8dadc", "#ffb703"
+]
 
 colors_problems = {
     "<800": "#AAAAAA",
@@ -396,7 +409,12 @@ elif mode == "Individual":
         "legendary grandmaster": "#AA0000",
     }
 
-    color = color_map.get(rank.lower(), "black")
+
+    if isinstance(rank, str):
+        color = color_map.get(rank.lower(), "black")
+    else:
+        color = "black"
+        rank = "unrated"
 
     st.markdown(
         f'### 🔗 Perfil no Codeforces: <a href="{profile_url}" target="_blank" style="color:{color}; font-weight:700;">{user}</a> <span style="color:gray;">({rank})</span>',
@@ -409,8 +427,15 @@ elif mode == "Individual":
 
     col1, col2, col3, col4 = st.columns(4)
 
-    col1.metric("🧠 Rating atual", info["rating"])
-    col2.metric("🏆 Rating máximo", info["maxRating"])
+    col1.metric(
+        "🧠 Rating atual",
+        "-" if pd.isna(info.get("rating")) else int(info["rating"])
+    )
+
+    col2.metric(
+        "🏆 Rating máximo",
+        "-" if pd.isna(info.get("maxRating")) else int(info["maxRating"])
+    )
     col3.metric("🧩 Problemas resolvidos", u_solved.shape[0])
     col4.metric("🏁 Contests", u_rating.shape[0])
 
@@ -424,6 +449,7 @@ elif mode == "Individual":
     diff = u_solved.dropna(subset=["problem.rating"])
 
     if not diff.empty:
+        diff = diff.copy()
         diff["difficulty"] = pd.cut(
             diff["problem.rating"], bins=bins, labels=labels
         )
@@ -468,9 +494,24 @@ elif mode == "Individual":
         else:
             tag_counts = user_tags_exploded["tag"].value_counts()
             tag_pct = (tag_counts / tag_counts.sum() * 100).round(1)
-
+            color_tag = [tag_colors[i % len(tag_colors)] for i in range(len(tag_counts))]
+            # fig_tags = go.Figure(
+            #     data=[go.Pie(labels=tag_pct.index, values=tag_pct.values, textinfo="label+percent")] )
+            
             fig_tags = go.Figure(
-                data=[go.Pie(labels=tag_pct.index, values=tag_pct.values, textinfo="label+percent")]
+                data=[go.Bar(
+                    x=tag_counts.index,
+                    y=tag_counts.values,
+                    text=tag_counts.values,
+                    textposition="outside",
+                    marker=dict(color=tag_colors)
+                )]
+            )
+
+            fig_tags.update_layout(
+                xaxis_title="Tag",
+                yaxis_title="Quantidade de problemas",
+                height=500
             )
 
             fig_tags.update_layout(height=500)
@@ -624,23 +665,35 @@ else:
         else:
             tag_counts = tags_df["tag"].value_counts()
             tag_pct = (tag_counts / tag_counts.sum() * 100).round(1)
+            
+            colors = [tag_colors[i % len(tag_colors)] for i in range(len(tag_counts))]
 
+            # pizza
+            # fig = go.Figure(
+            #     data=[go.Pie(
+            #         labels=tag_pct.index,
+            #         values=tag_pct.values,
+            #         textinfo="label+percent"
+            #     )]
+            # )
+
+            # barras
             fig = go.Figure(
-                data=[go.Pie(
-                    labels=tag_pct.index,
-                    values=tag_pct.values,
-                    textinfo="label+percent"
+                data=[go.Bar(
+                    x=tag_counts.index,
+                    y=tag_counts.values,
+                    text=tag_counts.values,
+                    textposition="outside",
+                    marker=dict(color=tag_colors)
                 )]
+            )
+
+            fig.update_layout(
+                xaxis_title="Tag",
+                yaxis_title="Quantidade de problemas",
+                height=500
             )
 
             fig.update_layout(height=500)
 
             st.plotly_chart(fig, width='stretch')
-
-            st.dataframe(
-                pd.DataFrame({
-                    "Tag": tag_counts.index,
-                    "Questões": tag_counts.values
-                }).reset_index(drop=True),
-                width="stretch"
-            )
