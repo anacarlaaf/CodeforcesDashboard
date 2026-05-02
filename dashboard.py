@@ -3,12 +3,17 @@ import pandas as pd
 import plotly.graph_objects as go
 import requests
 import datetime
+import time
+import hashlib
 
 st.set_page_config(
     layout="wide",
     page_title="ICOMP | CP Dashboard",
     page_icon="📊"
 )
+
+api_key = st.secrets["CODEFORCES_API_KEY"]
+api_secret = st.secrets["CODEFORCES_API_SECRET"]
 
 tag_colors= [
     "#1f77b4", "#8ecae6", "#ff2d2d", "#ff9896",
@@ -35,9 +40,54 @@ colors_problems = {
 BASE = "https://codeforces.com/api/"
 
 @st.cache_data(ttl=3600)
-def cf_request(method, params):
+def get_contest_size(contest_id):
+    url = "https://codeforces.com/api/contest.standings"
+    
+    params = {
+        "contestId": contest_id,
+        "from": 1,
+        "count": 1
+    }
+
+    r = requests.get(url, params=params).json()
+    print(r)
+    print(r)
+    
+    problems = r["result"]["problems"]
+    return len(problems)
+
+@st.cache_data(ttl=3600)
+def cf_request(method, params=None):
+    if params is None:
+        params = {}
+
+    rand = "123456"
+    now = int(time.time())
+
+    # adicionar autenticação
+    params["apiKey"] = api_key
+    params["time"] = now
+
+    # ordenar parâmetros alfabeticamente
+    sorted_params = "&".join(
+        f"{k}={params[k]}" for k in sorted(params)
+    )
+
+    # string para hash
+    to_hash = f"{rand}/{method}?{sorted_params}#{api_secret}"
+
+    sha = hashlib.sha512(to_hash.encode()).hexdigest()
+
+    params["apiSig"] = rand + sha
+
     r = requests.get(BASE + method, params=params)
-    return r.json()["result"]
+    data = r.json()
+
+    if data["status"] != "OK":
+        st.error(data["comment"])
+        return []
+
+    return data["result"]
 
 @st.cache_data(ttl=3600)
 def load_data(handles):
@@ -697,3 +747,72 @@ else:
             fig.update_layout(height=500)
 
             st.plotly_chart(fig, width='stretch')
+    
+    # =============================
+    # EVOLUÇÃO (acertos em contests)
+    # =============================
+
+    # team_subs = subs[subs["handle"].isin(team_handles)]
+
+    # # pegar apenas submissões de contests (ignorar gym opcional)
+    # team_subs = team_subs.dropna(subset=["contestId"])
+
+    # # agrupar por contest
+    # contests = team_subs["contestId"].unique()
+
+    # contest_data = []
+
+    # for cid in contests:
+    #     contest_subs = team_subs[team_subs["contestId"] == cid]
+
+    #     # problemas únicos tentados pelo time
+    #     attempted = set(
+    #         (row["problem.contestId"], row["problem.index"])
+    #         for _, row in contest_subs.iterrows()
+    #     )
+
+    #     # problemas únicos resolvidos
+    #     solved = set(
+    #         (row["problem.contestId"], row["problem.index"])
+    #         for _, row in contest_subs.iterrows()
+    #         if row["verdict"] == "OK"
+    #     )
+
+    #     total_problems = get_contest_size(cid)
+
+    #     if total_problems == 0:
+    #         continue
+
+    #     accuracy = len(solved) / total_problems
+
+    #     # pegar data do contest
+    #     contest_time = contest_subs["date"].min()
+
+    #     contest_data.append({
+    #         "contestId": cid,
+    #         "date": contest_time,
+    #         "accuracy": accuracy * 100
+    #     })
+
+    #     contest_df = pd.DataFrame(contest_data)
+
+    #     contest_df = contest_df.sort_values("date")
+
+    #     fig = go.Figure()
+
+    #     fig.add_trace(go.Scatter(
+    #         x=contest_df["date"],
+    #         y=contest_df["accuracy"],
+    #         mode="lines+markers",
+    #         name="Acurácia (%)"
+    #     ))
+
+    #     fig.update_layout(
+    #         title="📈 Acurácia do time por contest",
+    #         xaxis_title="Data",
+    #         yaxis_title="% de acertos",
+    #         yaxis=dict(range=[0, 100]),
+    #         height=500
+    #     )
+
+    #     st.plotly_chart(fig, width="stretch")
