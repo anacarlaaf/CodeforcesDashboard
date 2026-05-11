@@ -149,7 +149,7 @@ st.title("📊 Codeforces")
 
 handles_input = st.sidebar.text_input(
     "Handles",
-    "anacarlaaf,luanzito,rebecamadi,lip33, nathan0603"
+    "anacarlaaf,luanzito,rebecamadi,lip33, nathan0603, alexandre.pereira, felipefraxe"
 )
 
 handles = [h.strip() for h in handles_input.split(",") if h.strip()]
