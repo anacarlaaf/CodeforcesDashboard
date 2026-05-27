@@ -1,3 +1,7 @@
 venv/
 
 .streamlit/
+.gitignore
+.devcontainer
+__pycache__
+.devcontainer

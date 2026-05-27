@@ -1,19 +1,14 @@
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
-import requests
 import datetime
-import time
-import hashlib
+import codeforces
 
 st.set_page_config(
     layout="wide",
     page_title="ICOMP | CP Dashboard",
     page_icon="📊"
 )
-
-api_key = st.secrets["CODEFORCES_API_KEY"]
-api_secret = st.secrets["CODEFORCES_API_SECRET"]
 
 tag_colors= [
     "#1f77b4", "#8ecae6", "#ff2d2d", "#ff9896",
@@ -37,122 +32,29 @@ colors_problems = {
 # API
 # =============================
 
-BASE = "https://codeforces.com/api/"
-
-@st.cache_data(ttl=3600)
-def get_contest_size(contest_id):
-    url = "https://codeforces.com/api/contest.standings"
-    
-    params = {
-        "contestId": contest_id,
-        "from": 1,
-        "count": 1
-    }
-
-    r = requests.get(url, params=params).json()
-    print(r)
-    print(r)
-    
-    problems = r["result"]["problems"]
-    return len(problems)
-
-@st.cache_data(ttl=3600)
-def cf_request(method, params=None):
-    if params is None:
-        params = {}
-
-    rand = "123456"
-    now = int(time.time())
-
-    # adicionar autenticação
-    params["apiKey"] = api_key
-    params["time"] = now
-
-    # ordenar parâmetros alfabeticamente
-    sorted_params = "&".join(
-        f"{k}={params[k]}" for k in sorted(params)
-    )
-
-    # string para hash
-    to_hash = f"{rand}/{method}?{sorted_params}#{api_secret}"
-
-    sha = hashlib.sha512(to_hash.encode()).hexdigest()
-
-    params["apiSig"] = rand + sha
-
-    r = requests.get(BASE + method, params=params)
-    data = r.json()
-
-    if data["status"] != "OK":
-        st.error(data["comment"])
-        return []
-
-    return data["result"]
-
-@st.cache_data(ttl=3600)
-def load_data(handles):
-    all_subs = []
-    all_rating = []
-    users = []
-
-    for h in handles:
-        info = cf_request("user.info", {"handles": h})[0]
-        users.append(info)
-
-        subs = cf_request("user.status", {"handle": h, "count": 1000})
-        for s in subs:
-            s["handle"] = h
-        all_subs.extend(subs)
-
-        rating = cf_request("user.rating", {"handle": h})
-        for r in rating:
-            r["handle"] = h
-        all_rating.extend(rating)
-
-    subs_df = pd.json_normalize(all_subs)
-    rating_df = pd.DataFrame(all_rating)
-    users_df = pd.DataFrame(users)
-
-    return subs_df, rating_df, users_df
-
-def cf_rank_color(rank):
-    colors = {
-        "newbie": "#808080",
-        "pupil": "#008000",
-        "specialist": "#03A89E",
-        "expert": "#0000FF",
-        "candidate master": "#AA00AA",
-        "master": "#FF8C00",
-        "international master": "#FF8C00",
-        "grandmaster": "#FF0000",
-        "international grandmaster": "#CC0000",
-        "legendary grandmaster": "#AA0000",
-    }
-
-    if isinstance(rank, str):
-        return f"color: {colors.get(rank.lower(), 'black')}; font-weight: bold;"
-    return ""
-
-
-def progress_bar_scaled(done, total, size=7):
-    if total == 0:
-        return ""
-    ratio = min(done / total, 1)
-    filled = int(ratio * size)
-    return "🟩" * filled + "🟥" * (size - filled)
-
 # =============================
 # SIDEBAR
 # =============================
 
 st.title("📊 Codeforces")
 
-handles_input = st.sidebar.text_input(
-    "Handles",
-    "anacarlaaf,luanzito,rebecamadi,lip33, nathan0603, alexandre.pereira, felipefraxe, evelynkae"
+df = pd.read_csv("users.csv")
+
+handles = (
+    df["codeforces"]
+    .dropna()
+    .astype(str)
+    .str.strip()
 )
 
-handles = [h.strip() for h in handles_input.split(",") if h.strip()]
+handles = handles[handles != ""].tolist()
+
+handles_input = st.sidebar.text_input(
+    "Handles",
+    ",".join(handles)
+)
+
+handles = [h.strip() for h in handles if h.strip()]
 
 mode = st.sidebar.radio("Modo", ["Todos", "Individual", "Time"])
 
@@ -206,7 +108,7 @@ if st.sidebar.button("🔄 Atualizar dados"):
 # CARREGAR DADOS
 # =============================
 
-subs, rating, users = load_data(handles)
+subs, rating, users = codeforces.load_data(handles)
 
 subs["date"] = pd.to_datetime(subs["creationTimeSeconds"], unit="s", utc=True)
 rating["date"] = pd.to_datetime(rating["ratingUpdateTimeSeconds"], unit="s", utc=True)
@@ -226,10 +128,6 @@ unique_solved = solved.drop_duplicates(
 # =============================
 # MODO TODOS
 # =============================
-
-def progress_bar(done, total):
-    done = min(done, total)
-    return "🟩" * done + "🟥" * (total - done)
 
 if mode == "Todos":
 
@@ -282,11 +180,11 @@ if mode == "Todos":
     max_digits_contests = len(str(target_contests))
 
     ranking["problems"] = ranking["problems_solved"].apply(
-        lambda x: f"{str(x).rjust(max_digits_problems, "\u2007")}/{total_days}  {progress_bar_scaled(x, total_days)}"
+        lambda x: f"{str(x).rjust(max_digits_problems, "\u2007")}/{total_days}  {codeforces.progress_bar_scaled(x, total_days)}"
     )
 
     ranking["contests"] = ranking["official_contests"].apply(
-        lambda x: f"{str(x).rjust(max_digits_contests, "\u2007")}/{target_contests}  {progress_bar_scaled(x, target_contests, 2)}"
+        lambda x: f"{str(x).rjust(max_digits_contests, "\u2007")}/{target_contests}  {codeforces.progress_bar_scaled(x, target_contests, 2)}"
     )
 
     # Ordenar por rating
@@ -296,9 +194,7 @@ if mode == "Todos":
             "rating",
             "maxRating",
             "rank",
-            #"problems_solved",
             "problems",
-            #"official_contests",
             "contests",
         ]
     ]
@@ -309,14 +205,12 @@ if mode == "Todos":
         "rating": "Rating",
         "maxRating": "Max Rating",
         "rank": "Rank",
-        #"problems_solved": "Problemas",
-        #"official_contests": "Contests",
         "problems": "Problems",
         "contests": "Contests"
     })
 
     styled = ranking.style.map(
-        cf_rank_color,
+        codeforces.cf_rank_color,
         subset=["Rank"]
     )
 
@@ -655,11 +549,11 @@ else:
     max_digits_contests = len(str(target_contests))
 
     ranking["problems"] = ranking["problems_solved"].apply(
-        lambda x: f"{str(x).rjust(max_digits_problems, '\u2007')}/{total_days}  {progress_bar_scaled(x, total_days)}"
+        lambda x: f"{str(x).rjust(max_digits_problems, '\u2007')}/{total_days}  {codeforces.progress_bar_scaled(x, total_days)}"
     )
 
     ranking["contests"] = ranking["official_contests"].apply(
-        lambda x: f"{str(x).rjust(max_digits_contests, '\u2007')}/{target_contests}  {progress_bar_scaled(x, target_contests, 2)}"
+        lambda x: f"{str(x).rjust(max_digits_contests, '\u2007')}/{target_contests}  {codeforces.progress_bar_scaled(x, target_contests, 2)}"
     )
 
     ranking = ranking.sort_values("rating", ascending=False)[
@@ -683,7 +577,7 @@ else:
     })
 
     styled = ranking.style.map(
-        cf_rank_color,
+        codeforces.cf_rank_color,
         subset=["Rank"]
     )
 
@@ -718,16 +612,6 @@ else:
             
             colors = [tag_colors[i % len(tag_colors)] for i in range(len(tag_counts))]
 
-            # pizza
-            # fig = go.Figure(
-            #     data=[go.Pie(
-            #         labels=tag_pct.index,
-            #         values=tag_pct.values,
-            #         textinfo="label+percent"
-            #     )]
-            # )
-
-            # barras
             fig = go.Figure(
                 data=[go.Bar(
                     x=tag_counts.index,
@@ -748,71 +632,3 @@ else:
 
             st.plotly_chart(fig, width='stretch')
     
-    # =============================
-    # EVOLUÇÃO (acertos em contests)
-    # =============================
-
-    # team_subs = subs[subs["handle"].isin(team_handles)]
-
-    # # pegar apenas submissões de contests (ignorar gym opcional)
-    # team_subs = team_subs.dropna(subset=["contestId"])
-
-    # # agrupar por contest
-    # contests = team_subs["contestId"].unique()
-
-    # contest_data = []
-
-    # for cid in contests:
-    #     contest_subs = team_subs[team_subs["contestId"] == cid]
-
-    #     # problemas únicos tentados pelo time
-    #     attempted = set(
-    #         (row["problem.contestId"], row["problem.index"])
-    #         for _, row in contest_subs.iterrows()
-    #     )
-
-    #     # problemas únicos resolvidos
-    #     solved = set(
-    #         (row["problem.contestId"], row["problem.index"])
-    #         for _, row in contest_subs.iterrows()
-    #         if row["verdict"] == "OK"
-    #     )
-
-    #     total_problems = get_contest_size(cid)
-
-    #     if total_problems == 0:
-    #         continue
-
-    #     accuracy = len(solved) / total_problems
-
-    #     # pegar data do contest
-    #     contest_time = contest_subs["date"].min()
-
-    #     contest_data.append({
-    #         "contestId": cid,
-    #         "date": contest_time,
-    #         "accuracy": accuracy * 100
-    #     })
-
-    #     contest_df = pd.DataFrame(contest_data)
-
-    #     contest_df = contest_df.sort_values("date")
-
-    #     fig = go.Figure()
-
-    #     fig.add_trace(go.Scatter(
-    #         x=contest_df["date"],
-    #         y=contest_df["accuracy"],
-    #         mode="lines+markers",
-    #         name="Acurácia (%)"
-    #     ))
-
-    #     fig.update_layout(
-    #         title="📈 Acurácia do time por contest",
-    #         xaxis_title="Data",
-    #         yaxis_title="% de acertos",
-    #         yaxis=dict(range=[0, 100]),
-    #         height=500
-    #     )
-
-    #     st.plotly_chart(fig, width="stretch")
