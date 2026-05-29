@@ -162,7 +162,7 @@ def cf_request(
 # LOAD DATA
 # -----------------------------------
 
-@st.cache_data(ttl=3600)
+#@st.cache_data(ttl=3600)
 def load_data(handles):
 
     all_subs = []
