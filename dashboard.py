@@ -29,16 +29,12 @@ colors_problems = {
 }
 
 # =============================
-# API
-# =============================
-
-# =============================
 # SIDEBAR
 # =============================
 
 st.title("📊 Codeforces")
 
-df = pd.read_csv("users.csv")
+df = pd.read_csv("data/users.csv")
 
 handles = (
     df["codeforces"]
@@ -187,8 +183,11 @@ if mode == "Todos":
         lambda x: f"{str(x).rjust(max_digits_contests, "\u2007")}/{target_contests}  {codeforces.progress_bar_scaled(x, target_contests, 2)}"
     )
 
-    # Ordenar por rating
-    ranking = ranking.sort_values("rating", ascending=False)[
+    # Ordenar por problemas resolvidos
+    ranking = ranking.sort_values(
+        ["problems_solved", "rating"],
+        ascending=[False, False]
+    )[
         [
             "handle",
             "rating",
