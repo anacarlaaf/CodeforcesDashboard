@@ -127,13 +127,24 @@ def cf_request(
     # -----------------------------------
     # request
     # -----------------------------------
+    try:
 
-    r = requests.get(
-        BASE + method,
-        params=params,
-    )
+        r = requests.get(
+            BASE + method,
+            params=params,
+            timeout=20,
+        )
 
-    data = r.json()
+        data = r.json()
+
+    except Exception as e:
+
+        print(
+            f"[REQUEST ERROR] "
+            f"{handle} | {method} | {e}"
+        )
+
+        return []
 
     if data["status"] != "OK":
 

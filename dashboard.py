@@ -88,14 +88,28 @@ elif preset == "Últimos 3 meses":
 
 else:
     date_range = st.sidebar.date_input(
-        "Escolha o intervalo",
-        [today - datetime.timedelta(days=7), today]
+    "Escolha o intervalo",
+    [today - datetime.timedelta(days=7), today]
     )
 
-    start = pd.to_datetime(date_range[0], utc=True)
-    end = pd.to_datetime(date_range[1], utc=True)
-    end = end + pd.Timedelta(days=1) - pd.Timedelta(seconds=1)
+    if isinstance(date_range, tuple) or isinstance(date_range, list):
 
+        if len(date_range) == 2:
+            start_date, end_date = date_range
+
+        elif len(date_range) == 1:
+            start_date = end_date = date_range[0]
+
+        else:
+            start_date = end_date = today.date()
+
+    else:
+        start_date = end_date = date_range
+
+    start = pd.to_datetime(start_date, utc=True)
+
+    end = pd.to_datetime(end_date, utc=True)
+    end = end + pd.Timedelta(days=1) - pd.Timedelta(seconds=1)
 
 if st.sidebar.button("🔄 Atualizar dados"):
     st.cache_data.clear()
