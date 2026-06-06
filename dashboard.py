@@ -33,11 +33,13 @@ colors_problems = {
 }
 
 def trigger_cses_update():
-    token = st.secrets["GITHUB_TOKEN"]   # adicione esse secret no Streamlit também
-    repo = "seu-usuario/seu-repo"
+    token = st.secrets.get("GITHUB_TOKEN")
     
+    if not token:
+        return None
+
     r = requests.post(
-        f"https://api.github.com/repos/{repo}/actions/workflows/update_cses.yml/dispatches",
+        "https://api.github.com/repos/anacarlaaf/CodeforcesDashboard/actions/workflows/update_cses.yml/dispatches",
         headers={
             "Authorization": f"Bearer {token}",
             "Accept": "application/vnd.github+json",
