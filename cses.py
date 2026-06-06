@@ -17,6 +17,8 @@ HEADERS = {
     )
 }
 
+_raw = os.environ.get("CSES_ACCOUNTS")
+
 if not _raw:
     try:
         _raw = st.secrets.get("CSES_ACCOUNTS")
