@@ -3,6 +3,7 @@ import pandas as pd
 import plotly.graph_objects as go
 import datetime
 import codeforces
+import cses
 
 st.set_page_config(
     layout="wide",
@@ -20,6 +21,8 @@ tag_colors= [
 ]
 
 colors_problems = {
+    "CSES": "#f4a261",
+    "Gym/Unrated": "#E0E0E0",
     "<800": "#AAAAAA",
     "800–1200": "#77FF77",
     "1200–1600": "#77DDBB",
@@ -120,19 +123,60 @@ if st.sidebar.button("🔄 Atualizar dados"):
 
 subs, rating, users = codeforces.load_data(handles)
 
-subs["date"] = pd.to_datetime(subs["creationTimeSeconds"], unit="s", utc=True)
-rating["date"] = pd.to_datetime(rating["ratingUpdateTimeSeconds"], unit="s", utc=True)
+# Codeforces
+subs["date"] = pd.to_datetime(
+    subs["creationTimeSeconds"],
+    unit="s",
+    utc=True,
+)
 
-# Filtrar submissões
-subs = subs[(subs["date"] >= start) & (subs["date"] <= end)]
+rating["date"] = pd.to_datetime(
+    rating["ratingUpdateTimeSeconds"],
+    unit="s",
+    utc=True,
+)
 
-# Filtrar contests oficiais pelo mesmo período
-rating = rating[(rating["date"] >= start) & (rating["date"] <= end)]
+# CSES
+cses_subs = cses.load_submissions()
 
-solved = subs[subs["verdict"] == "OK"]
+# opcional: manter apenas usuários do dashboard
+cses_subs = cses_subs[
+    cses_subs["handle"].isin(handles)
+]
+
+cses_subs["problem.rating"] = -1
+
+# juntar CF + CSES
+subs = pd.concat(
+    [subs, cses_subs],
+    ignore_index=True,
+    sort=False,
+)
+
+# =============================
+# FILTROS
+# =============================
+
+subs = subs[
+    (subs["date"] >= start)
+    & (subs["date"] <= end)
+]
+
+rating = rating[
+    (rating["date"] >= start)
+    & (rating["date"] <= end)
+]
+
+solved = subs[
+    subs["verdict"] == "OK"
+]
 
 unique_solved = solved.drop_duplicates(
-    ["handle", "problem.contestId", "problem.index"]
+    [
+        "handle",
+        "problem.contestId",
+        "problem.index",
+    ]
 ).copy()
 
 # =============================
@@ -258,14 +302,25 @@ if mode == "Todos":
         # FAIXAS DE DIFICULDADE
         # =============================
 
-        bins = [0, 800, 1200, 1600, 2000, 2400, 5000]
-        labels = ["<800", "800–1200", "1200–1600",
-                "1600–2000", "2000–2400", "2400+"]
+        labels = [
+            "CSES",
+            "<800",
+            "800–1200",
+            "1200–1600",
+            "1600–2000",
+            "2000–2400",
+            "2400+",
+        ]
 
-        diff_df["difficulty"] = pd.cut(
-            diff_df["problem.rating"],
-            bins=bins,
-            labels=labels
+        diff_df["difficulty"] = "CSES"
+
+        mask_cf = diff_df["problem.rating"] >= 0
+
+        diff_df.loc[mask_cf, "difficulty"] = pd.cut(
+            diff_df.loc[mask_cf, "problem.rating"],
+            bins=[0, 800, 1200, 1600, 2000, 2400, 5000],
+            labels=labels[1:],
+            right=False,      # 0–799
         )
 
         # Pivot: problemas por usuário por dificuldade
@@ -276,12 +331,22 @@ if mode == "Todos":
             .unstack(fill_value=0)
         )
 
+        pivot = pivot.reindex(
+            columns=labels,
+            fill_value=0
+        )
+
         # Garantir todos os handles
         for h in handles:
             if h not in pivot.index:
                 pivot.loc[h] = 0
 
         pivot = pivot.sort_index()
+
+        pivot = pivot.reindex(
+            columns=labels,
+            fill_value=0
+        )
 
         # =============================
         # CONTAGEM DE GYM
@@ -298,14 +363,13 @@ if mode == "Todos":
         fig = go.Figure()
 
         # Barras por dificuldade
-        for diff in labels:
-            if diff in pivot.columns:
-                fig.add_bar(
-                    x=pivot.index,
-                    y=pivot[diff],
-                    name=diff,
-                    marker_color=colors_problems.get(diff)
-                )
+        for d in labels:
+            fig.add_bar(
+                x=pivot.index,
+                y=pivot[d],
+                name=d,
+                marker_color=colors_problems.get(d)
+            )
 
         # Barra Gym (branca + textura cinza)
         fig.add_bar(
@@ -399,70 +463,134 @@ elif mode == "Individual":
     # Dificuldade
     st.subheader("🧠 Distribuição por dificuldade")
 
-    bins = [0, 800, 1200, 1600, 2000, 2400, 5000]
-    labels = ["<800", "800–1200", "1200–1600",
-            "1600–2000", "2000–2400", "2400+"]
+    labels = [
+        "CSES",
+        "Gym/Unrated",
+        "<800",
+        "800–1200",
+        "1200–1600",
+        "1600–2000",
+        "2000–2400",
+        "2400+",
+    ]
 
-    diff = u_solved.dropna(subset=["problem.rating"])
+    diff = u_solved.copy()
+
+    # padrão = Gym
+    diff["difficulty"] = "Gym/Unrated"
+
+    # CSES
+    diff.loc[
+        diff["problem.rating"] == -1,
+        "difficulty"
+    ] = "CSES"
+
+    # Problemas normais CF
+    mask_cf = (
+        diff["problem.rating"].notna()
+        & (diff["problem.rating"] >= 0)
+    )
+
+    diff.loc[mask_cf, "difficulty"] = pd.cut(
+        diff.loc[mask_cf, "problem.rating"],
+        bins=[0, 800, 1200, 1600, 2000, 2400, 5000],
+        labels=labels[2:],   # começa em <800
+        right=False,
+    )
 
     if not diff.empty:
-        diff = diff.copy()
-        diff["difficulty"] = pd.cut(
-            diff["problem.rating"], bins=bins, labels=labels
+
+        pie = (
+            diff["difficulty"]
+            .value_counts()
+            .reindex(labels, fill_value=0)
         )
 
-        pie = diff["difficulty"].value_counts()
+        pie = pie[pie > 0]
 
-        # Lista de cores na ordem do pie
-        pie_colors = [colors_problems.get(label, "#CCCCCC") for label in pie.index]
+        pie_colors = [
+            colors_problems.get(label, "#DDDDDD")
+            for label in pie.index
+        ]
 
         fig = go.Figure(
-            data=[go.Pie(
-                labels=pie.index,
-                values=pie.values,
-                marker=dict(colors=pie_colors)
-            )]
+            data=[
+                go.Pie(
+                    labels=pie.index,
+                    values=pie.values,
+                    marker=dict(colors=pie_colors)
+                )
+            ]
         )
 
-        st.plotly_chart(fig, width='stretch')
+        st.plotly_chart(fig, width="stretch")
 
-    # =============================
-    # TIPOS DE PROBLEMAS RESOLVIDOS
-    # =============================
+        # =============================
+        # TIPOS DE PROBLEMAS RESOLVIDOS
+        # =============================
 
-    st.subheader("🏷️ Tipos de problemas resolvidos")
+        st.subheader("🏷️ Tipos de problemas resolvidos")
 
-    user_tags_df = u_solved.dropna(subset=["problem.tags"]).copy()
-
-    if user_tags_df.empty:
-        st.info("Sem dados de tags no período.")
-    else:
         tag_rows = []
-        for _, row in user_tags_df.iterrows():
-            tags = row["problem.tags"]
-            if isinstance(tags, list):
+
+        for _, row in u_solved.iterrows():
+
+            rating = row.get("problem.rating")
+
+            # -------------------------
+            # CSES
+            # -------------------------
+            if rating == -1:
+                tag_rows.append({"tag": "CSES"})
+                continue
+
+            # -------------------------
+            # Gym / Unrated
+            # -------------------------
+            if pd.isna(rating) or rating >= 100000:
+                tag_rows.append({"tag": "Gym/Unrated"})
+                continue
+
+            # -------------------------
+            # Problemas normais CF
+            # -------------------------
+            tags = row.get("problem.tags")
+
+            if isinstance(tags, list) and len(tags) > 0:
                 for tag in tags:
                     tag_rows.append({"tag": tag})
+            else:
+                tag_rows.append({"tag": "Sem tags"})
 
-        user_tags_exploded = pd.DataFrame(tag_rows)
+        tags_df = pd.DataFrame(tag_rows)
 
-        if user_tags_exploded.empty:
+        if tags_df.empty:
             st.info("Sem dados de tags no período.")
         else:
-            tag_counts = user_tags_exploded["tag"].value_counts()
-            tag_pct = (tag_counts / tag_counts.sum() * 100).round(1)
-            color_tag = [tag_colors[i % len(tag_colors)] for i in range(len(tag_counts))]
-            # fig_tags = go.Figure(
-            #     data=[go.Pie(labels=tag_pct.index, values=tag_pct.values, textinfo="label+percent")] )
-            
+
+            tag_counts = tag_df = (
+                tags_df["tag"]
+                .value_counts()
+                .sort_values(ascending=False)
+            )
+
+            colors = [
+                "#f4a261" if tag == "CSES"
+                else "#E0E0E0" if tag == "Gym/Unrated"
+                else tag_colors[i % len(tag_colors)]
+                for i, tag in enumerate(tag_counts.index)
+            ]
+
             fig_tags = go.Figure(
-                data=[go.Bar(
-                    x=tag_counts.index,
-                    y=tag_counts.values,
-                    text=tag_counts.values,
-                    textposition="outside",
-                    marker=dict(color=tag_colors)
-                )]
+                data=[
+                    go.Bar(
+                        x=tag_counts.index,
+                        y=tag_counts.values,
+                        text=tag_counts.values,
+                        textposition="outside",
+                        marker=dict(color=colors)
+                    )
+                ]
             )
 
             fig_tags.update_layout(
@@ -471,16 +599,15 @@ elif mode == "Individual":
                 height=500
             )
 
-            fig_tags.update_layout(height=500)
-
-            st.plotly_chart(fig_tags, width='stretch')
+            st.plotly_chart(fig_tags, width="stretch")
 
             st.dataframe(
-                pd.DataFrame({"Tag": tag_counts.index, "Questões": tag_counts.values})
-                .reset_index(drop=True),
-                width='stretch',
+                pd.DataFrame({
+                    "Tag": tag_counts.index,
+                    "Questões": tag_counts.values
+                }).reset_index(drop=True),
+                width="stretch",
             )
-
 # =============================
 # MODO TIME
 # =============================
@@ -602,46 +729,57 @@ else:
 
     st.subheader("🏷️ Tipos de problemas resolvidos")
 
-    user_tags_df = team_solved.dropna(subset=["problem.tags"]).copy()
+    tag_rows = []
 
-    if user_tags_df.empty:
+    for _, row in team_solved.iterrows():
+
+        rating = row.get("problem.rating")
+
+        # CSES
+        if rating == -1:
+            tag_rows.append({"tag": "CSES"})
+            continue
+
+        tags = row.get("problem.tags")
+
+        # Tags normais do CF
+        if isinstance(tags, list) and len(tags) > 0:
+            for tag in tags:
+                tag_rows.append({"tag": tag})
+
+        # Gym/unrated ou problemas sem tags
+        else:
+            tag_rows.append({"tag": "Sem tags"})
+
+    tags_df = pd.DataFrame(tag_rows)
+
+    if tags_df.empty:
         st.info("Sem dados no período.")
     else:
-        tag_rows = []
 
-        for _, row in user_tags_df.iterrows():
-            tags = row["problem.tags"]
-            if isinstance(tags, list):
-                for tag in tags:
-                    tag_rows.append({"tag": tag})
+        tag_counts = tags_df["tag"].value_counts()
 
-        tags_df = pd.DataFrame(tag_rows)
+        colors = [
+            tag_colors[i % len(tag_colors)]
+            for i in range(len(tag_counts))
+        ]
 
-        if tags_df.empty:
-            st.info("Sem dados no período.")
-        else:
-            tag_counts = tags_df["tag"].value_counts()
-            tag_pct = (tag_counts / tag_counts.sum() * 100).round(1)
-            
-            colors = [tag_colors[i % len(tag_colors)] for i in range(len(tag_counts))]
-
-            fig = go.Figure(
-                data=[go.Bar(
+        fig = go.Figure(
+            data=[
+                go.Bar(
                     x=tag_counts.index,
                     y=tag_counts.values,
                     text=tag_counts.values,
                     textposition="outside",
-                    marker=dict(color=tag_colors)
-                )]
-            )
+                    marker=dict(color=colors)
+                )
+            ]
+        )
 
-            fig.update_layout(
-                xaxis_title="Tag",
-                yaxis_title="Quantidade de problemas",
-                height=500
-            )
+        fig.update_layout(
+            xaxis_title="Tag",
+            yaxis_title="Quantidade de problemas",
+            height=500
+        )
 
-            fig.update_layout(height=500)
-
-            st.plotly_chart(fig, width='stretch')
-    
+        st.plotly_chart(fig, width="stretch")
