@@ -561,7 +561,7 @@ def get_new_problem_codes(
             for user, codes in solved_tasks.items()
         }
 
-    df = pd.read_csv(cses_all_csv)
+    df = pd.read_parquet(cses_all_csv)
 
     result = {}
 

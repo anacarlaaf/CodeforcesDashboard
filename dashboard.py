@@ -133,13 +133,14 @@ else:
 
 if st.sidebar.button("🔄 Atualizar dados"):
     st.cache_data.clear()
-    with st.spinner("Disparando atualização do CSES..."):
-        ok = trigger_cses_update()
-        if ok:
-            st.sidebar.success("Atualização iniciada! O parquet será atualizado em ~2 min.")
-        else:
-            st.sidebar.warning("Não foi possível disparar o workflow.")
-
+    ok = trigger_cses_update()
+    if ok is None:
+        st.sidebar.info("Rodando local — dados do CF atualizados.")
+    elif ok:
+        st.sidebar.success("Atualização iniciada! CSES atualizado em ~2 min.")
+    else:
+        st.sidebar.warning("Não foi possível disparar o workflow.")
+        
 # =============================
 # CARREGAR DADOS
 # =============================

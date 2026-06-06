@@ -6,6 +6,6 @@ import cses
 
 cses.update(
     users_csv="data/users.csv",
-    problems_csv="data/cses_problems.parquet",
+    problems_csv="data/cses_problems.csv",
     cses_all_csv="data/cses_all.parquet",
 )
