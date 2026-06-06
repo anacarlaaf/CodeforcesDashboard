@@ -1,4 +1,0 @@
-import pandas as pd
-
-df = pd.read_csv("data/cses_problems.csv")
-df.to_parquet("data/cses_problems.parquet", index=False)
