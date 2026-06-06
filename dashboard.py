@@ -135,9 +135,9 @@ if st.sidebar.button("🔄 Atualizar dados"):
     st.cache_data.clear()
     ok = trigger_cses_update()
     if ok is None:
-        st.sidebar.info("Rodando local — dados do CF atualizados.")
+        st.sidebar.info("Dados do CF atualizados.")
     elif ok:
-        st.sidebar.success("Atualização iniciada! CSES atualizado em ~2 min.")
+        st.sidebar.success("Atualização iniciada. Aguarde...")
     else:
         st.sidebar.warning("Não foi possível disparar o workflow.")
         
