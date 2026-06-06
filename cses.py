@@ -663,6 +663,11 @@ def update(
             cses_all_csv,
             index=False,
         )
+        df_new["time"] = pd.to_datetime(df_new["time"], utc=True)
+        df_new.to_parquet(
+            cses_all_csv,
+            index=False,
+        )
 
         print(
             f"Criado {cses_all_csv}"
@@ -674,17 +679,16 @@ def update(
         cses_all_csv
     )
 
+    df_new["time"] = pd.to_datetime(df_new["time"], utc=True)
+    df_old["time"] = pd.to_datetime(df_old["time"], utc=True)
+
     df_final = pd.concat(
         [df_old, df_new],
         ignore_index=True,
     )
 
-    # proteção extra contra duplicatas
     df_final = df_final.drop_duplicates(
-        subset=[
-            "user",
-            "problem_code",
-        ],
+        subset=["user", "problem_code"],
         keep="last",
     )
 
