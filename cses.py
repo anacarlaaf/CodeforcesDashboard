@@ -658,11 +658,6 @@ def update(
 
     # primeira execução
     if not Path(cses_all_csv).exists():
-
-        df_new.to_parquet(
-            cses_all_csv,
-            index=False,
-        )
         df_new["time"] = pd.to_datetime(df_new["time"], utc=True)
         df_new.to_parquet(
             cses_all_csv,
