@@ -5,6 +5,7 @@ import streamlit as st
 import pandas as pd
 import time
 import json
+import os
 
 BASE_URL = "https://cses.fi"
 
@@ -16,7 +17,8 @@ HEADERS = {
     )
 }
 
-accounts = json.loads(st.secrets["CSES_ACCOUNTS"])
+_raw = os.environ.get("CSES_ACCOUNTS") or st.secrets.get("CSES_ACCOUNTS")
+accounts = json.loads(_raw)
 
 users = pd.read_csv("data/users.csv")
 
@@ -534,11 +536,11 @@ def get_last_accepted_for_codes(
 
 def get_new_problem_codes(
     users_csv: str,
-    cses_all_csv: str = "cses_all.csv",
+    cses_all_csv: str = "cses_all.parquet",
 ):
     """
     Retorna apenas os problemas ainda não presentes
-    em cses_all.csv.
+    em cses_all.parquet.
 
     Retorno:
 
@@ -597,10 +599,10 @@ def get_new_problem_codes(
 def update(
     users_csv: str,
     problems_csv: str,
-    cses_all_csv: str = "cses_all.csv",
+    cses_all_csv: str = "cses_all.parquet",
 ):
     """
-    Atualiza cses_all.csv apenas com
+    Atualiza cses_all.parquet apenas com
     os problemas novos encontrados.
     """
 
@@ -647,7 +649,7 @@ def update(
     # primeira execução
     if not Path(cses_all_csv).exists():
 
-        df_new.to_csv(
+        df_new.to_parquet(
             cses_all_csv,
             index=False,
         )
@@ -658,7 +660,7 @@ def update(
 
         return df_new
 
-    df_old = pd.read_csv(
+    df_old = pd.read_parquet(
         cses_all_csv
     )
 
@@ -680,7 +682,7 @@ def update(
         ["user", "time"]
     )
 
-    df_final.to_csv(
+    df_final.to_parquet(
         cses_all_csv,
         index=False,
     )
@@ -695,11 +697,11 @@ def update(
 def sync_cses_data(
     users_csv="data/users.csv",
     problems_csv="data/cses_problems.csv",
-    cses_all_csv="data/cses_all.csv",
+    cses_all_csv="data/cses_all.parquet",
 ):
     """
     Verifica se existem novas soluções no CSES.
-    Se existirem, atualiza cses_all.csv.
+    Se existirem, atualiza cses_all.parquet.
     """
 
     try:
@@ -713,19 +715,20 @@ def sync_cses_data(
         print(f"Erro ao sincronizar CSES: {e}")
 
 def load_submissions(
-    cses_all_csv="data/cses_all.csv",
+    cses_all_csv="data/cses_all.parquet",
     users_csv="data/users.csv",
     problems_csv="data/cses_problems.csv",
 ):
     
-        # garante atualização antes de carregar
-    sync_cses_data(
-        users_csv=users_csv,
-        problems_csv=problems_csv,
-        cses_all_csv=cses_all_csv,
-    )
+    # garante atualização antes de carregar
+    # agora atualiza por fora
+    # sync_cses_data(
+    #     users_csv=users_csv,
+    #     problems_csv=problems_csv,
+    #     cses_all_csv=cses_all_csv,
+    # )
 
-    df = pd.read_csv(cses_all_csv)
+    df = pd.read_parquet(cses_all_csv)
 
     if df.empty:
         return pd.DataFrame()

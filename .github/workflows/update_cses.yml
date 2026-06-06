@@ -1,0 +1,35 @@
+name: Atualizar dados CSES
+
+on:
+  schedule:
+    - cron: '0 6 * * *'    # todo dia às 06h UTC (03h Manaus)
+  workflow_dispatch:         # permite disparo manual e via API
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Instalar dependências
+        run: pip install -r requirements.txt
+
+      - name: Rodar atualização CSES
+        env:
+          CSES_ACCOUNTS: ${{ secrets.CSES_ACCOUNTS }}
+        run: python scripts/run_cses_update.py
+
+      - name: Commit e push do parquet atualizado
+        run: |
+          git config user.email "actions@github.com"
+          git config user.name "GitHub Actions"
+          git add data/cses_all.parquet
+          git diff --cached --quiet || git commit -m "chore: update cses_all.parquet"
+          git push

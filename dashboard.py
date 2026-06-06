@@ -4,6 +4,7 @@ import plotly.graph_objects as go
 import datetime
 import codeforces
 import cses
+import requests
 
 st.set_page_config(
     layout="wide",
@@ -30,6 +31,20 @@ colors_problems = {
     "2000–2400": "#AA77FF",
     "2400+": "#FF7777",
 }
+
+def trigger_cses_update():
+    token = st.secrets["GITHUB_TOKEN"]   # adicione esse secret no Streamlit também
+    repo = "seu-usuario/seu-repo"
+    
+    r = requests.post(
+        f"https://api.github.com/repos/{repo}/actions/workflows/update_cses.yml/dispatches",
+        headers={
+            "Authorization": f"Bearer {token}",
+            "Accept": "application/vnd.github+json",
+        },
+        json={"ref": "main"},
+    )
+    return r.status_code == 204
 
 # =============================
 # SIDEBAR
@@ -116,6 +131,12 @@ else:
 
 if st.sidebar.button("🔄 Atualizar dados"):
     st.cache_data.clear()
+    with st.spinner("Disparando atualização do CSES..."):
+        ok = trigger_cses_update()
+        if ok:
+            st.sidebar.success("Atualização iniciada! O parquet será atualizado em ~2 min.")
+        else:
+            st.sidebar.warning("Não foi possível disparar o workflow.")
 
 # =============================
 # CARREGAR DADOS
