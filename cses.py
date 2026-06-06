@@ -17,7 +17,17 @@ HEADERS = {
     )
 }
 
-_raw = os.environ.get("CSES_ACCOUNTS") or st.secrets.get("CSES_ACCOUNTS")
+_raw = os.environ.get("CSES_ACCOUNTS")
+
+if not _raw:
+    try:
+        _raw = st.secrets.get("CSES_ACCOUNTS")
+    except Exception:
+        pass
+
+if not _raw:
+    raise RuntimeError("CSES_ACCOUNTS não encontrado.")
+
 accounts = json.loads(_raw)
 
 users = pd.read_csv("data/users.csv")
