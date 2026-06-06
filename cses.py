@@ -723,6 +723,7 @@ def sync_cses_data(
     except Exception as e:
         print(f"Erro ao sincronizar CSES: {e}")
 
+@st.cache_data(ttl=300)
 def load_submissions(
     cses_all_csv="data/cses_all.parquet",
     users_csv="data/users.csv",
