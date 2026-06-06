@@ -761,12 +761,9 @@ def load_submissions(
 
     # remover quem não possui handle CF cadastrado
     df = df.dropna(subset=["handle"])
-
-    df["date"] = pd.to_datetime(
-        df["time"],
-        utc=True,
-    )
-
+    
+    df["date"] = pd.to_datetime(df["time"], utc=True, errors="coerce")
+    print(df[["time","date"]].head())
     df["problem.contestId"] = "CSES"
 
     df["problem.index"] = (

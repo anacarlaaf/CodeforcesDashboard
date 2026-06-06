@@ -96,15 +96,15 @@ today = datetime.datetime.now(datetime.timezone.utc)
 
 if preset == "Última semana":
     start = today - datetime.timedelta(days=7)
-    end = today
+    end = today.replace(hour=23, minute=59, second=59, microsecond=999999)
 
 elif preset == "Último mês":
     start = today - datetime.timedelta(days=30)
-    end = today
+    end = today.replace(hour=23, minute=59, second=59, microsecond=999999)
 
 elif preset == "Últimos 3 meses":
     start = today - datetime.timedelta(days=90)
-    end = today
+    end = today.replace(hour=23, minute=59, second=59, microsecond=999999)
 
 else:
     date_range = st.sidebar.date_input(
@@ -162,21 +162,19 @@ rating["date"] = pd.to_datetime(
 
 # CSES
 cses_subs = cses.load_submissions()
-
-# opcional: manter apenas usuários do dashboard
-cses_subs = cses_subs[
-    cses_subs["handle"].isin(handles)
-]
-
+cses_subs = cses_subs[cses_subs["handle"].isin(handles)]
 cses_subs["problem.rating"] = -1
 
-# juntar CF + CSES
+# juntar CF + CSES — agora ambos já têm date correto
 subs = pd.concat(
     [subs, cses_subs],
     ignore_index=True,
     sort=False,
 )
 
+# temporário
+print("CSES no subs logo após concat:")
+print(subs[subs["source"] == "CSES"][["handle","date","verdict"]].groupby("handle").count())
 # =============================
 # FILTROS
 # =============================
@@ -185,6 +183,13 @@ subs = subs[
     (subs["date"] >= start)
     & (subs["date"] <= end)
 ]
+
+
+
+print("start:", start)
+print("end:", end)
+print("CSES após filtro:")
+print(subs[subs["source"] == "CSES"][["handle","date"]].tail(10))
 
 rating = rating[
     (rating["date"] >= start)
