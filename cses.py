@@ -293,12 +293,15 @@ def get_solved_tasks_by_user(
 
     users_df = pd.read_csv(users_csv)
 
-    users_df = users_df[
-        users_df["cses_user"]
-        .fillna("")
-        .str.strip()
-        .ne("")
-    ]
+    users_df = (
+        users_df[
+            users_df["cses_user"]
+            .fillna("")
+            .str.strip()
+            .ne("")
+        ]
+        .reset_index(drop=True)
+    )
 
     sessions = get_cses_sessions()
 
@@ -322,7 +325,7 @@ def get_solved_tasks_by_user(
         )
 
         # usa a sessão do próprio usuário
-        session = sessions.get(cses_user)
+        session = sessions["by_user"].get(cses_user)
 
         if session is None:
 
@@ -461,9 +464,7 @@ def get_last_accepted_for_codes(
 
     sessions = get_cses_sessions()
 
-    session = sessions["by_user"].get(
-        user
-    )
+    session = sessions["by_user"].get(user)
 
     if session is None:
 
