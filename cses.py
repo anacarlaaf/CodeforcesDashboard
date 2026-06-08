@@ -94,21 +94,37 @@ def login_cses(user: str, password: str):
 
 @st.cache_resource
 def get_cses_sessions():
+    """
+    Retorna:
 
-    sessions = {}
+    {
+        "by_user": {
+            "anacarlaaf": Session(),
+            ...
+        },
+        "all": [
+            Session(),
+            Session(),
+            ...
+        ]
+    }
+    """
+
+    sessions_by_user = {}
 
     for acc in accounts:
 
         user = acc["user"]
+        password = acc["password"]
 
         try:
 
             session = login_cses(
                 user=user,
-                password=acc["password"],
+                password=password,
             )
 
-            sessions[user] = session
+            sessions_by_user[user] = session
 
         except Exception as e:
 
@@ -116,24 +132,35 @@ def get_cses_sessions():
                 f"Erro login {user}: {e}"
             )
 
-    if not sessions:
+    if len(sessions_by_user) == 0:
 
         raise RuntimeError(
             "Nenhuma sessão autenticada."
         )
 
-    return sessions
+    print(
+        f"\n✅ {len(sessions_by_user)} sessões autenticadas."
+    )
+
+    return {
+        "by_user": sessions_by_user,
+        "all": list(
+            sessions_by_user.values()
+        ),
+    }
 
 def get_rotating_session(
     sessions,
     index: int,
 ):
     """
-    Rotaciona sessões.
+    Sessão rotativa.
     """
 
-    return sessions[
-        index % len(sessions)
+    pool = sessions["all"]
+
+    return pool[
+        index % len(pool)
     ]
 
 def update_cses_stats(
@@ -266,6 +293,13 @@ def get_solved_tasks_by_user(
 
     users_df = pd.read_csv(users_csv)
 
+    users_df = users_df[
+        users_df["cses_user"]
+        .fillna("")
+        .str.strip()
+        .ne("")
+    ]
+
     sessions = get_cses_sessions()
 
     result = {}
@@ -274,7 +308,10 @@ def get_solved_tasks_by_user(
 
     for idx, row in users_df.iterrows():
 
-        if pd.isna(row["cses_code"]) or pd.isna(row["cses_user"]):
+        if (
+            pd.isna(row["cses_code"])
+            or pd.isna(row["cses_user"])
+        ):
             continue
 
         cses_user = row["cses_user"]
@@ -284,11 +321,18 @@ def get_solved_tasks_by_user(
             f"\n[{idx+1}/{total}] USER: {cses_user}"
         )
 
-        # sessão rotativa
-        session = get_rotating_session(
-            sessions,
-            idx,
-        )
+        # usa a sessão do próprio usuário
+        session = sessions.get(cses_user)
+
+        if session is None:
+
+            print(
+                f"SEM SESSÃO PARA {cses_user}"
+            )
+
+            result[cses_user] = []
+
+            continue
 
         url = (
             f"{BASE_URL}/problemset/user/"
@@ -330,8 +374,6 @@ def get_solved_tasks_by_user(
 
                 parts = href.strip("/").split("/")
 
-                # apenas:
-                # /problemset/task/<id>/
                 if (
                     len(parts) >= 3
                     and parts[0] == "problemset"
@@ -340,9 +382,9 @@ def get_solved_tasks_by_user(
 
                     try:
 
-                        task_id = int(parts[2])
-
-                        solved.add(task_id)
+                        solved.add(
+                            int(parts[2])
+                        )
 
                     except ValueError:
                         pass
@@ -357,7 +399,9 @@ def get_solved_tasks_by_user(
 
         except Exception as e:
 
-            print("ERROR:", e)
+            print(
+                f"ERROR {cses_user}: {e}"
+            )
 
             result[cses_user] = []
 
@@ -417,7 +461,9 @@ def get_last_accepted_for_codes(
 
     sessions = get_cses_sessions()
 
-    session = sessions.get(user)
+    session = sessions["by_user"].get(
+        user
+    )
 
     if session is None:
 
