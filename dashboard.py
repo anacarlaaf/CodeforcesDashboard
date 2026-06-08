@@ -133,13 +133,16 @@ else:
 
 if st.sidebar.button("🔄 Atualizar dados"):
     st.cache_data.clear()
+    st.cache_resource.clear()
+
     ok = trigger_cses_update()
-    if ok is None:
-        st.sidebar.info("Dados do CF atualizados.")
-    elif ok:
-        st.sidebar.success("Atualização iniciada. Aguarde...")
-    else:
-        st.sidebar.warning("Não foi possível disparar o workflow.")
+
+    if ok:
+        st.sidebar.success(
+            "Atualização iniciada."
+        )
+    
+    st.rerun()
         
 # =============================
 # CARREGAR DADOS
