@@ -92,28 +92,23 @@ def login_cses(user: str, password: str):
 
     return session
 
-
 @st.cache_resource
 def get_cses_sessions():
-    """
-    Cria pool de sessões autenticadas.
-    """
 
-    sessions = []
+    sessions = {}
 
     for acc in accounts:
 
         user = acc["user"]
-        password = acc["password"]
 
         try:
 
             session = login_cses(
                 user=user,
-                password=password,
+                password=acc["password"],
             )
 
-            sessions.append(session)
+            sessions[user] = session
 
         except Exception as e:
 
@@ -121,15 +116,11 @@ def get_cses_sessions():
                 f"Erro login {user}: {e}"
             )
 
-    if len(sessions) == 0:
+    if not sessions:
 
         raise RuntimeError(
             "Nenhuma sessão autenticada."
         )
-
-    print(
-        f"\n✅ {len(sessions)} sessões autenticadas."
-    )
 
     return sessions
 
@@ -425,7 +416,16 @@ def get_last_accepted_for_codes(
     )
 
     sessions = get_cses_sessions()
-    session = sessions[0]
+
+    session = sessions.get(user)
+
+    if session is None:
+
+        print(
+            f"Sem sessão para {user}"
+        )
+
+        return pd.DataFrame()
 
     user_code = user_code_map.get(user)
 
