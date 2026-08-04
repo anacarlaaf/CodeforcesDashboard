@@ -4,6 +4,7 @@ import plotly.graph_objects as go
 import datetime
 import codeforces
 import cses
+import rankings
 import requests
 
 st.set_page_config(
@@ -32,14 +33,14 @@ colors_problems = {
     "2400+": "#FF7777",
 }
 
-def trigger_cses_update():
+def trigger_workflow(workflow_file: str):
     token = st.secrets.get("GITHUB_TOKEN")
-    
+
     if not token:
         return None
 
     r = requests.post(
-        "https://api.github.com/repos/anacarlaaf/CodeforcesDashboard/actions/workflows/update_cses.yml/dispatches",
+        f"https://api.github.com/repos/anacarlaaf/CodeforcesDashboard/actions/workflows/{workflow_file}/dispatches",
         headers={
             "Authorization": f"Bearer {token}",
             "Accept": "application/vnd.github+json",
@@ -52,7 +53,7 @@ def trigger_cses_update():
 # SIDEBAR
 # =============================
 
-st.title("📊 Codeforces")
+st.title("🎈 Grupo de Programação Competitiva da UFAM")
 
 df = pd.read_csv("data/users.csv")
 
@@ -135,20 +136,30 @@ if st.sidebar.button("🔄 Atualizar dados"):
     st.cache_data.clear()
     st.cache_resource.clear()
 
-    ok = trigger_cses_update()
+    ok_cses = trigger_workflow("update_cses.yml")
+    ok_cf = trigger_workflow("update_cf.yml")
 
-    if ok:
+    if ok_cses and ok_cf:
         st.sidebar.success(
-            "Atualização iniciada."
+            "Atualização iniciada (CSES + Codeforces)."
         )
-    
+    elif ok_cses or ok_cf:
+        st.sidebar.warning(
+            "Apenas uma das atualizações foi iniciada. "
+            "Verifique se o workflow 'update_cf.yml' existe no repositório."
+        )
+    else:
+        st.sidebar.error(
+            "Não foi possível iniciar a atualização. Verifique o GITHUB_TOKEN."
+        )
+
     st.rerun()
         
 # =============================
 # CARREGAR DADOS
 # =============================
 
-subs, rating, users = codeforces.load_data(handles)
+subs, rating, users = codeforces.load_data(handles=handles)
 
 # Codeforces
 subs["date"] = pd.to_datetime(
@@ -226,6 +237,62 @@ if mode == "Todos":
     col2.metric("📩 Submissões", subs.shape[0])
     col3.metric("🧩 Problemas resolvidos", unique_solved.shape[0])
     col4.metric("🏁 Contests", rating["contestId"].nunique())  # corrigido
+
+    # =============================
+    # DESTAQUES DO PERÍODO (top 3)
+    # =============================
+
+    st.subheader("🥇 Destaques do período")
+
+    medals = ["🥇", "🥈", "🥉"]
+
+    def render_ranking(col, title, df, value_col, suffix=""):
+        with col:
+            st.markdown(f"**{title}**")
+
+            if df.empty:
+                st.caption("Sem dados no período.")
+                return
+
+            for i, row in df.reset_index(drop=True).iterrows():
+                medal = medals[i] if i < len(medals) else "•"
+                st.markdown(
+                    f"{medal} **{row['handle']}** — {row[value_col]} {suffix}"
+                )
+
+    rk_col1, rk_col2, rk_col3, rk_col4 = st.columns(4)
+
+    render_ranking(
+        rk_col1,
+        "Mais questões no total",
+        rankings.top_total_solved(unique_solved),
+        "questões",
+        "questões",
+    )
+
+    render_ranking(
+        rk_col2,
+        "Mais questões no Codeforces",
+        rankings.top_codeforces_solved(unique_solved),
+        "questões",
+        "questões",
+    )
+
+    render_ranking(
+        rk_col3,
+        "Mais questões no CSES",
+        rankings.top_cses_solved(unique_solved),
+        "questões",
+        "questões",
+    )
+
+    render_ranking(
+        rk_col4,
+        "Maior frequência",
+        rankings.top_frequency(subs),
+        "dias",
+        "dias com submissão",
+    )
 
     # Ranking
     st.subheader("🏆 Ranking por Rating")
