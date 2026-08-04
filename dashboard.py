@@ -291,7 +291,7 @@ if mode == "Todos":
         "Maior frequência",
         rankings.top_frequency(subs),
         "dias",
-        "dias com submissão",
+        "dias",
     )
 
     # Ranking
