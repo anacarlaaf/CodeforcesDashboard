@@ -31,3 +31,4 @@ logs/
 .streamlit/secrets.toml
 .streamlit/secrets.toml
 .streamlit/secrets.toml
+.env
