@@ -102,11 +102,11 @@ def build_message(period_label: str, start: datetime.datetime, end: datetime.dat
     subs, unique_solved = build_dataset(start, end)
 
     blocks = [
-        "🎈Olá, GCP! Vamos ver como vão os treinos? 👀🪶",
+        "🎈Olá, GCP! Vamos ver como vão os treinos? 🦾🧠",
         "",
         f"🏆 *RANKING {period_label.upper()}* 🏆",
         format_top(
-            "Mais questões no total",
+            "Mais questões no total", 
             rankings.top_total_solved(unique_solved),
             "questões", "questões",
         ),

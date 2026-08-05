@@ -6,3 +6,7 @@ prophet
 requests
 datetime
 streamlit>=1.32.0
+
+python-telegram-bot>=20.0
+pytz>=2023.3
+beautifulsoup4>=4.11.0
