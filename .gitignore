@@ -1,0 +1,33 @@
+# Python
+
+.streamlit/
+.devcontainer
+
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+.venv/
+env/
+.env/
+ENV/
+*.log
+
+# Dados
+data/*.parquet
+data/*.csv
+data/telegram_users.json
+
+# IDE
+.vscode/
+.idea/
+
+# Sistema
+.DS_Store
+*.lock
+logs/
+.streamlit/secrets.toml
+.streamlit/secrets.toml
+.streamlit/secrets.toml

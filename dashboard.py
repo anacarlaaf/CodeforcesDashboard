@@ -1,0 +1,884 @@
+import streamlit as st
+import pandas as pd
+import plotly.graph_objects as go
+import datetime
+import codeforces
+import cses
+import rankings
+import requests
+
+st.set_page_config(
+    layout="wide",
+    page_title="ICOMP | CP Dashboard",
+    page_icon="📊"
+)
+
+tag_colors= [
+    "#1f77b4", "#8ecae6", "#ff2d2d", "#ff9896",
+    "#2a9d8f", "#6ede8a", "#f77f00", "#f4a261",
+    "#6a4c93", "#adb5bd",
+    "#339af0", "#1d3557", "#f08080", "#2d6a4f",
+    "#74c69d", "#52b788", "#e76f51", "#457b9d",
+    "#a8dadc", "#ffb703"
+]
+
+colors_problems = {
+    "CSES": "#f4a261",
+    "Gym/Unrated": "#E0E0E0",
+    "<800": "#AAAAAA",
+    "800–1200": "#77FF77",
+    "1200–1600": "#77DDBB",
+    "1600–2000": "#7777FF",
+    "2000–2400": "#AA77FF",
+    "2400+": "#FF7777",
+}
+
+def trigger_workflow(workflow_file: str):
+    token = st.secrets.get("GITHUB_TOKEN")
+
+    if not token:
+        return None
+
+    r = requests.post(
+        f"https://api.github.com/repos/anacarlaaf/CodeforcesDashboard/actions/workflows/{workflow_file}/dispatches",
+        headers={
+            "Authorization": f"Bearer {token}",
+            "Accept": "application/vnd.github+json",
+        },
+        json={"ref": "main"},
+    )
+    return r.status_code == 204
+
+# =============================
+# SIDEBAR
+# =============================
+
+st.title("🎈 Grupo de Programação Competitiva da UFAM")
+
+df = pd.read_csv("data/users.csv")
+
+handles = (
+    df["codeforces"]
+    .dropna()
+    .astype(str)
+    .str.strip()
+)
+
+handles = handles[handles != ""].tolist()
+
+handles_input = st.sidebar.text_input(
+    "Handles",
+    ",".join(handles)
+)
+
+handles = [h.strip() for h in handles if h.strip()]
+
+mode = st.sidebar.radio("Modo", ["Todos", "Individual", "Time"])
+
+team_default = ["luanzito", "rebecamadi", "lip33"] if len(handles) >= 3 else handles + ["", "", ""]
+
+# =============================
+# INTERVALO DE DATAS
+# =============================
+
+st.sidebar.subheader("📅 Intervalo")
+
+preset = st.sidebar.radio(
+    "Período rápido",
+    [
+        "Última semana",
+        "Último mês",
+        "Últimos 3 meses",
+        "Personalizado",
+    ]
+)
+
+today = datetime.datetime.now(datetime.timezone.utc)
+
+if preset == "Última semana":
+    start = today - datetime.timedelta(days=7)
+    end = today.replace(hour=23, minute=59, second=59, microsecond=999999)
+
+elif preset == "Último mês":
+    start = today - datetime.timedelta(days=30)
+    end = today.replace(hour=23, minute=59, second=59, microsecond=999999)
+
+elif preset == "Últimos 3 meses":
+    start = today - datetime.timedelta(days=90)
+    end = today.replace(hour=23, minute=59, second=59, microsecond=999999)
+
+else:
+    date_range = st.sidebar.date_input(
+    "Escolha o intervalo",
+    [today - datetime.timedelta(days=7), today]
+    )
+
+    if isinstance(date_range, tuple) or isinstance(date_range, list):
+
+        if len(date_range) == 2:
+            start_date, end_date = date_range
+
+        elif len(date_range) == 1:
+            start_date = end_date = date_range[0]
+
+        else:
+            start_date = end_date = today.date()
+
+    else:
+        start_date = end_date = date_range
+
+    start = pd.to_datetime(start_date, utc=True)
+
+    end = pd.to_datetime(end_date, utc=True)
+    end = end + pd.Timedelta(days=1) - pd.Timedelta(seconds=1)
+
+if st.sidebar.button("🔄 Atualizar dados"):
+    st.cache_data.clear()
+    st.cache_resource.clear()
+
+    ok_cses = trigger_workflow("update_cses.yml")
+    ok_cf = trigger_workflow("update_cf.yml")
+
+    if ok_cses and ok_cf:
+        st.sidebar.success(
+            "Atualização iniciada (CSES + Codeforces)."
+        )
+    elif ok_cses or ok_cf:
+        st.sidebar.warning(
+            "Apenas uma das atualizações foi iniciada. "
+            "Verifique se o workflow 'update_cf.yml' existe no repositório."
+        )
+    else:
+        st.sidebar.error(
+            "Não foi possível iniciar a atualização. Verifique o GITHUB_TOKEN."
+        )
+
+    st.rerun()
+        
+# =============================
+# CARREGAR DADOS
+# =============================
+
+subs, rating, users = codeforces.load_data(handles=handles)
+
+# Codeforces
+subs["date"] = pd.to_datetime(
+    subs["creationTimeSeconds"],
+    unit="s",
+    utc=True,
+)
+
+rating["date"] = pd.to_datetime(
+    rating["ratingUpdateTimeSeconds"],
+    unit="s",
+    utc=True,
+)
+
+# CSES
+cses_subs = cses.load_submissions()
+cses_subs = cses_subs[cses_subs["handle"].isin(handles)]
+cses_subs["problem.rating"] = -1
+
+# juntar CF + CSES — agora ambos já têm date correto
+subs = pd.concat(
+    [subs, cses_subs],
+    ignore_index=True,
+    sort=False,
+)
+
+# temporário
+print("CSES no subs logo após concat:")
+print(subs[subs["source"] == "CSES"][["handle","date","verdict"]].groupby("handle").count())
+# =============================
+# FILTROS
+# =============================
+
+subs = subs[
+    (subs["date"] >= start)
+    & (subs["date"] <= end)
+]
+
+
+
+print("start:", start)
+print("end:", end)
+print("CSES após filtro:")
+print(subs[subs["source"] == "CSES"][["handle","date"]].tail(10))
+
+rating = rating[
+    (rating["date"] >= start)
+    & (rating["date"] <= end)
+]
+
+solved = subs[
+    subs["verdict"] == "OK"
+]
+
+unique_solved = solved.drop_duplicates(
+    [
+        "handle",
+        "problem.contestId",
+        "problem.index",
+    ]
+).copy()
+
+# =============================
+# MODO TODOS
+# =============================
+
+if mode == "Todos":
+
+    st.header("👥 Visão de Todos")
+
+    # KPI
+    col1, col2, col3, col4 = st.columns(4)
+
+    col1.metric("👥 Usuários", users.shape[0])
+    col2.metric("📩 Submissões", subs.shape[0])
+    col3.metric("🧩 Problemas resolvidos", unique_solved.shape[0])
+    col4.metric("🏁 Contests", rating["contestId"].nunique())  # corrigido
+
+    # =============================
+    # DESTAQUES DO PERÍODO (top 3)
+    # =============================
+
+    st.subheader("🥇 Destaques do período")
+
+    medals = ["🥇", "🥈", "🥉"]
+
+    def render_ranking(col, title, df, value_col, suffix=""):
+        with col:
+            st.markdown(f"**{title}**")
+
+            if df.empty:
+                st.caption("Sem dados no período.")
+                return
+
+            for i, row in df.reset_index(drop=True).iterrows():
+                medal = medals[i] if i < len(medals) else "•"
+                st.markdown(
+                    f"{medal} **{row['handle']}** — {row[value_col]} {suffix}"
+                )
+
+    rk_col1, rk_col2, rk_col3, rk_col4 = st.columns(4)
+
+    render_ranking(
+        rk_col1,
+        "Mais questões no total",
+        rankings.top_total_solved(unique_solved),
+        "questões",
+        "questões",
+    )
+
+    render_ranking(
+        rk_col2,
+        "Mais questões no Codeforces",
+        rankings.top_codeforces_solved(unique_solved),
+        "questões",
+        "questões",
+    )
+
+    render_ranking(
+        rk_col3,
+        "Mais questões no CSES",
+        rankings.top_cses_solved(unique_solved),
+        "questões",
+        "questões",
+    )
+
+    render_ranking(
+        rk_col4,
+        "Maior frequência",
+        rankings.top_frequency(subs),
+        "dias",
+        "dias",
+    )
+
+    # Ranking
+    st.subheader("🏆 Ranking por Rating")
+
+    # Problemas resolvidos por usuário
+    solved_count = (
+        unique_solved.groupby("handle")
+        .size()
+        .rename("problems_solved")
+    )
+
+    # Contests oficiais por usuário
+    contest_count = (
+        rating.groupby("handle")
+        .size()
+        .rename("official_contests")
+    )
+
+    # Merge com users
+    ranking = users.merge(
+        solved_count, on="handle", how="left"
+    ).merge(
+        contest_count, on="handle", how="left"
+    )
+
+    ranking["rating"] = ranking["rating"].fillna(0).astype(int)
+    ranking["maxRating"] = ranking["maxRating"].fillna(0).astype(int)
+
+    # Preencher NaN com 0
+    ranking["problems_solved"] = ranking["problems_solved"].fillna(0).astype(int)
+    ranking["official_contests"] = ranking["official_contests"].fillna(0).astype(int)
+
+    total_days = (end - start).days
+    total_months = total_days // 30
+    target_contests = max(2, int(total_months * 2))
+
+    max_digits_problems = len(str(ranking["problems_solved"].max()))
+    max_digits_contests = len(str(target_contests))
+
+    ranking["problems"] = ranking["problems_solved"].apply(
+        lambda x: f"{str(x).rjust(max_digits_problems, "\u2007")}/{total_days}  {codeforces.progress_bar_scaled(x, total_days)}"
+    )
+
+    ranking["contests"] = ranking["official_contests"].apply(
+        lambda x: f"{str(x).rjust(max_digits_contests, "\u2007")}/{target_contests}  {codeforces.progress_bar_scaled(x, target_contests, 2)}"
+    )
+
+    # Ordenar por problemas resolvidos
+    ranking = ranking.sort_values(
+        ["problems_solved", "rating"],
+        ascending=[False, False]
+    )[
+        [
+            "handle",
+            "rating",
+            "maxRating",
+            "rank",
+            "problems",
+            "contests",
+        ]
+    ]
+
+    # Renomear para exibição
+    ranking = ranking.rename(columns={
+        "handle": "Handle",
+        "rating": "Rating",
+        "maxRating": "Max Rating",
+        "rank": "Rank",
+        "problems": "Problems",
+        "contests": "Contests"
+    })
+
+    styled = ranking.style.map(
+        codeforces.cf_rank_color,
+        subset=["Rank"]
+    )
+
+    st.dataframe(styled, width="stretch")
+
+    # ======================================================
+    # PROBLEMAS RESOLVIDOS POR USUÁRIO (POR DIFICULDADE)
+    # ======================================================
+
+    st.subheader("🧩 Problemas resolvidos por usuário (por dificuldade)")
+
+    # --- Identificar problemas Gym ---
+    unique_solved["is_gym"] = (
+        unique_solved["problem.rating"].isna() |
+        (unique_solved["problem.rating"] >= 100000)
+    )    
+    # --- Separar dados ---
+    # Não-gym com rating
+    diff_df = unique_solved[
+        (~unique_solved["is_gym"]) &
+        (~unique_solved["problem.rating"].isna())
+    ].copy()
+
+    # Apenas gym
+    gym_df = unique_solved[unique_solved["is_gym"]].copy()
+
+    if diff_df.empty and gym_df.empty:
+        st.info("Sem dados no período.")
+    else:
+
+        # =============================
+        # FAIXAS DE DIFICULDADE
+        # =============================
+
+        labels = [
+            "CSES",
+            "<800",
+            "800–1200",
+            "1200–1600",
+            "1600–2000",
+            "2000–2400",
+            "2400+",
+        ]
+
+        diff_df["difficulty"] = "CSES"
+
+        mask_cf = diff_df["problem.rating"] >= 0
+
+        diff_df.loc[mask_cf, "difficulty"] = pd.cut(
+            diff_df.loc[mask_cf, "problem.rating"],
+            bins=[0, 800, 1200, 1600, 2000, 2400, 5000],
+            labels=labels[1:],
+            right=False,      # 0–799
+        )
+
+        # Pivot: problemas por usuário por dificuldade
+        pivot = (
+            diff_df
+            .groupby(["handle", "difficulty"], observed=False)
+            .size()
+            .unstack(fill_value=0)
+        )
+
+        pivot = pivot.reindex(
+            columns=labels,
+            fill_value=0
+        )
+
+        # Garantir todos os handles
+        for h in handles:
+            if h not in pivot.index:
+                pivot.loc[h] = 0
+
+        pivot = pivot.sort_index()
+
+        pivot = pivot.reindex(
+            columns=labels,
+            fill_value=0
+        )
+
+        # =============================
+        # CONTAGEM DE GYM
+        # =============================
+
+        gym_counts = gym_df.groupby("handle").size()
+        gym_counts = gym_counts.reindex(handles, fill_value=0)
+        gym_counts = gym_counts.sort_index()
+
+        # =============================
+        # GRÁFICO
+        # =============================
+
+        fig = go.Figure()
+
+        # Barras por dificuldade
+        for d in labels:
+            fig.add_bar(
+                x=pivot.index,
+                y=pivot[d],
+                name=d,
+                marker_color=colors_problems.get(d)
+            )
+
+        # Barra Gym (branca + textura cinza)
+        fig.add_bar(
+            x=gym_counts.index,
+            y=gym_counts.values,
+            name="gym/unrated",
+            marker=dict(
+                color="white",
+                pattern=dict(
+                    shape="/",
+                    fgcolor="gray"
+                )
+            )
+        )
+
+        fig.update_layout(
+            barmode="stack",
+            xaxis_title="Usuário",
+            yaxis_title="Problemas resolvidos",
+            height=500
+        )
+
+        st.plotly_chart(fig, width='stretch')
+
+# =============================
+# MODO INDIVIDUAL
+# =============================
+
+elif mode == "Individual":
+
+    st.header("👤 Visão Individual")
+
+    user = st.selectbox("Usuário", handles)
+
+    u_subs = subs[subs["handle"] == user]
+    u_solved = unique_solved[unique_solved["handle"] == user]
+    u_rating = rating[rating["handle"] == user]
+
+    info = users[users["handle"] == user].iloc[0]
+
+    # =============================
+    # LINK PARA O PERFIL
+    # =============================
+
+    profile_url = f"https://codeforces.com/profile/{user}"
+    rank = info["rank"]
+
+    color_map = {
+        "newbie": "#808080",
+        "pupil": "#008000",
+        "specialist": "#03A89E",
+        "expert": "#0000FF",
+        "candidate master": "#AA00AA",
+        "master": "#FF8C00",
+        "international master": "#FF8C00",
+        "grandmaster": "#FF0000",
+        "international grandmaster": "#CC0000",
+        "legendary grandmaster": "#AA0000",
+    }
+
+
+    if isinstance(rank, str):
+        color = color_map.get(rank.lower(), "black")
+    else:
+        color = "black"
+        rank = "unrated"
+
+    st.markdown(
+        f'### 🔗 Perfil no Codeforces: <a href="{profile_url}" target="_blank" style="color:{color}; font-weight:700;">{user}</a> <span style="color:gray;">({rank})</span>',
+        unsafe_allow_html=True
+    )
+
+    # =============================
+    # KPIs
+    # =============================
+
+    col1, col2, col3, col4 = st.columns(4)
+
+    col1.metric(
+        "🧠 Rating atual",
+        "-" if pd.isna(info.get("rating")) else int(info["rating"])
+    )
+
+    col2.metric(
+        "🏆 Rating máximo",
+        "-" if pd.isna(info.get("maxRating")) else int(info["maxRating"])
+    )
+    col3.metric("🧩 Problemas resolvidos", u_solved.shape[0])
+    col4.metric("🏁 Contests", u_rating.shape[0])
+
+    # Dificuldade
+    st.subheader("🧠 Distribuição por dificuldade")
+
+    labels = [
+        "CSES",
+        "Gym/Unrated",
+        "<800",
+        "800–1200",
+        "1200–1600",
+        "1600–2000",
+        "2000–2400",
+        "2400+",
+    ]
+
+    diff = u_solved.copy()
+
+    # padrão = Gym
+    diff["difficulty"] = "Gym/Unrated"
+
+    # CSES
+    diff.loc[
+        diff["problem.rating"] == -1,
+        "difficulty"
+    ] = "CSES"
+
+    # Problemas normais CF
+    mask_cf = (
+        diff["problem.rating"].notna()
+        & (diff["problem.rating"] >= 0)
+    )
+
+    diff.loc[mask_cf, "difficulty"] = pd.cut(
+        diff.loc[mask_cf, "problem.rating"],
+        bins=[0, 800, 1200, 1600, 2000, 2400, 5000],
+        labels=labels[2:],   # começa em <800
+        right=False,
+    )
+
+    if not diff.empty:
+
+        pie = (
+            diff["difficulty"]
+            .value_counts()
+            .reindex(labels, fill_value=0)
+        )
+
+        pie = pie[pie > 0]
+
+        pie_colors = [
+            colors_problems.get(label, "#DDDDDD")
+            for label in pie.index
+        ]
+
+        fig = go.Figure(
+            data=[
+                go.Pie(
+                    labels=pie.index,
+                    values=pie.values,
+                    marker=dict(colors=pie_colors)
+                )
+            ]
+        )
+
+        st.plotly_chart(fig, width="stretch")
+
+        # =============================
+        # TIPOS DE PROBLEMAS RESOLVIDOS
+        # =============================
+
+        st.subheader("🏷️ Tipos de problemas resolvidos")
+
+        tag_rows = []
+
+        for _, row in u_solved.iterrows():
+
+            rating = row.get("problem.rating")
+
+            # -------------------------
+            # CSES
+            # -------------------------
+            if rating == -1:
+                tag_rows.append({"tag": "CSES"})
+                continue
+
+            # -------------------------
+            # Gym / Unrated
+            # -------------------------
+            if pd.isna(rating) or rating >= 100000:
+                tag_rows.append({"tag": "Gym/Unrated"})
+                continue
+
+            # -------------------------
+            # Problemas normais CF
+            # -------------------------
+            tags = row.get("problem.tags")
+
+            if isinstance(tags, list) and len(tags) > 0:
+                for tag in tags:
+                    tag_rows.append({"tag": tag})
+            else:
+                tag_rows.append({"tag": "Sem tags"})
+
+        tags_df = pd.DataFrame(tag_rows)
+
+        if tags_df.empty:
+            st.info("Sem dados de tags no período.")
+        else:
+
+            tag_counts = tag_df = (
+                tags_df["tag"]
+                .value_counts()
+                .sort_values(ascending=False)
+            )
+
+            colors = [
+                "#f4a261" if tag == "CSES"
+                else "#E0E0E0" if tag == "Gym/Unrated"
+                else tag_colors[i % len(tag_colors)]
+                for i, tag in enumerate(tag_counts.index)
+            ]
+
+            fig_tags = go.Figure(
+                data=[
+                    go.Bar(
+                        x=tag_counts.index,
+                        y=tag_counts.values,
+                        text=tag_counts.values,
+                        textposition="outside",
+                        marker=dict(color=colors)
+                    )
+                ]
+            )
+
+            fig_tags.update_layout(
+                xaxis_title="Tag",
+                yaxis_title="Quantidade de problemas",
+                height=500
+            )
+
+            st.plotly_chart(fig_tags, width="stretch")
+
+            st.dataframe(
+                pd.DataFrame({
+                    "Tag": tag_counts.index,
+                    "Questões": tag_counts.values
+                }).reset_index(drop=True),
+                width="stretch",
+            )
+# =============================
+# MODO TIME
+# =============================
+
+else:
+    st.header("👥 Visão de Time")
+
+    st.subheader("👤 Seleção do Time")
+
+    col1, col2, col3 = st.columns(3)
+
+    inputs = []
+    cols = [col1, col2, col3]
+
+    for i in range(3):
+        with cols[i]:
+            h = st.text_input(
+                f"Handle {i+1}",
+                value=team_default[i],
+                key=f"team_{i}"
+            )
+            inputs.append(h)
+
+    team_handles = [h.strip() for h in inputs if h.strip()]
+
+    # evitar vazio
+    if not team_handles:
+        st.warning("Adicione pelo menos um handle no time.")
+        st.stop()
+
+    # =============================
+    # FILTRO DO TIME
+    # =============================
+
+    team_users = users[users["handle"].isin(team_handles)]
+    team_rating = rating[rating["handle"].isin(team_handles)]
+    team_solved = unique_solved[unique_solved["handle"].isin(team_handles)]
+
+    # =============================
+    # TABELA
+    # =============================
+
+    st.subheader("🏆 Ranking do Time")
+
+    # Problemas resolvidos por usuário
+    solved_count = (
+        team_solved.groupby("handle")
+        .size()
+        .rename("problems_solved")
+    )
+
+    # Contests oficiais por usuário
+    contest_count = (
+        team_rating.groupby("handle")
+        .size()
+        .rename("official_contests")
+    )
+
+    ranking = team_users.merge(
+        solved_count, on="handle", how="left"
+    ).merge(
+        contest_count, on="handle", how="left"
+    )
+
+    ranking["rating"] = ranking["rating"].fillna(0).astype(int)
+    ranking["maxRating"] = ranking["maxRating"].fillna(0).astype(int)
+
+    # Garantir que todos os handles apareçam
+    ranking = ranking.set_index("handle").reindex(team_handles).reset_index()
+
+    ranking["problems_solved"] = ranking["problems_solved"].fillna(0).astype(int)
+    ranking["official_contests"] = ranking["official_contests"].fillna(0).astype(int)
+
+    total_days = (end - start).days
+    total_months = total_days // 30
+    target_contests = max(2, int(total_months * 2))
+
+    max_digits_problems = len(str(ranking["problems_solved"].max()))
+    max_digits_contests = len(str(target_contests))
+
+    ranking["problems"] = ranking["problems_solved"].apply(
+        lambda x: f"{str(x).rjust(max_digits_problems, '\u2007')}/{total_days}  {codeforces.progress_bar_scaled(x, total_days)}"
+    )
+
+    ranking["contests"] = ranking["official_contests"].apply(
+        lambda x: f"{str(x).rjust(max_digits_contests, '\u2007')}/{target_contests}  {codeforces.progress_bar_scaled(x, target_contests, 2)}"
+    )
+
+    ranking = ranking.sort_values("rating", ascending=False)[
+        [
+            "handle",
+            "rating",
+            "maxRating",
+            "rank",
+            "problems",
+            "contests",
+        ]
+    ]
+
+    ranking = ranking.rename(columns={
+        "handle": "Handle",
+        "rating": "Rating",
+        "maxRating": "Max Rating",
+        "rank": "Rank",
+        "problems": "Problems",
+        "contests": "Contests"
+    })
+
+    styled = ranking.style.map(
+        codeforces.cf_rank_color,
+        subset=["Rank"]
+    )
+
+    st.dataframe(styled, width="stretch")
+
+    # =============================
+    # TAGS (AGREGADO DO TIME)
+    # =============================
+
+    st.subheader("🏷️ Tipos de problemas resolvidos")
+
+    tag_rows = []
+
+    for _, row in team_solved.iterrows():
+
+        rating = row.get("problem.rating")
+
+        # CSES
+        if rating == -1:
+            tag_rows.append({"tag": "CSES"})
+            continue
+
+        tags = row.get("problem.tags")
+
+        # Tags normais do CF
+        if isinstance(tags, list) and len(tags) > 0:
+            for tag in tags:
+                tag_rows.append({"tag": tag})
+
+        # Gym/unrated ou problemas sem tags
+        else:
+            tag_rows.append({"tag": "Sem tags"})
+
+    tags_df = pd.DataFrame(tag_rows)
+
+    if tags_df.empty:
+        st.info("Sem dados no período.")
+    else:
+
+        tag_counts = tags_df["tag"].value_counts()
+
+        colors = [
+            tag_colors[i % len(tag_colors)]
+            for i in range(len(tag_counts))
+        ]
+
+        fig = go.Figure(
+            data=[
+                go.Bar(
+                    x=tag_counts.index,
+                    y=tag_counts.values,
+                    text=tag_counts.values,
+                    textposition="outside",
+                    marker=dict(color=colors)
+                )
+            ]
+        )
+
+        fig.update_layout(
+            xaxis_title="Tag",
+            yaxis_title="Quantidade de problemas",
+            height=500
+        )
+
+        st.plotly_chart(fig, width="stretch")

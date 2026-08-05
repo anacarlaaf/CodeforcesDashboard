@@ -1,0 +1,60 @@
+name: Bot de Lembretes
+
+on:
+  schedule:
+    # Verifica a cada 1 minuto (mais preciso)
+    - cron: '* * * * *'
+  workflow_dispatch:
+
+jobs:
+  check-reminders:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout do código
+      uses: actions/checkout@v4
+    
+    - name: Configurar Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.10'
+    
+    - name: Instalar dependências
+      run: |
+        pip install python-telegram-bot pandas pytz requests beautifulsoup4 plotly streamlit
+    
+    - name: Criar diretório de dados
+      run: mkdir -p data
+    
+    - name: Verificar e enviar lembretes
+      env:
+        TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+        CODEFORCES_USERS: ${{ secrets.CODEFORCES_USERS }}
+        CSES_ACCOUNTS: ${{ secrets.CSES_ACCOUNTS }}
+      run: |
+        cd ${{ github.workspace }}
+        python -c "
+import sys
+import os
+sys.path.insert(0, '.')
+
+import logging
+import asyncio
+
+# CORREÇÃO: Importa do tucanito.py, não do telegram_bot.py
+from tucanito import check_and_send_reminders, application
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+logger.info('🔍 Verificando lembretes...')
+
+# Inicializa o bot
+app = application
+app.bot = app.bot
+
+# Verifica e envia lembretes
+asyncio.run(check_and_send_reminders(app))
+
+logger.info('✅ Verificação concluída')
+"
