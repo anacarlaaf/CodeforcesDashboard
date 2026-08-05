@@ -5,6 +5,11 @@ on:
     - cron: '0 6 * * *'
   workflow_dispatch:
 
+concurrency:
+  group: data-update
+  cancel-in-progress: false
+
+
 jobs:
   update:
     runs-on: ubuntu-latest
