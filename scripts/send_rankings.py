@@ -1,3 +1,8 @@
+import sys
+from pathlib import Path
+
+sys.path.append(str(Path(__file__).resolve().parent.parent))
+
 import argparse
 import datetime
 import os
@@ -8,7 +13,6 @@ import requests
 import codeforces
 import cses
 import rankings
-
 
 def build_dataset(start: datetime.datetime, end: datetime.datetime):
     """
@@ -131,7 +135,7 @@ def build_message(period_label: str, start: datetime.datetime, end: datetime.dat
 
 def send_telegram_message(text: str):
 
-    token = os.environ.get("TELEGRAM_BOT_TOKEN")
+    token = os.environ.get("TELEGRAM_BOT_ID")
     chat_id = os.environ.get("TELEGRAM_CHAT_ID")
 
     if not token or not chat_id:
