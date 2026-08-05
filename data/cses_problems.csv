@@ -1,0 +1,401 @@
+task_id,name,category,url
+1068,Weird Algorithm,Introductory Problems,https://cses.fi/problemset/task/1068
+1069,Repetitions,Introductory Problems,https://cses.fi/problemset/task/1069
+1070,Permutations,Introductory Problems,https://cses.fi/problemset/task/1070
+1071,Number Spiral,Introductory Problems,https://cses.fi/problemset/task/1071
+1072,Two Knights,Introductory Problems,https://cses.fi/problemset/task/1072
+1073,Towers,Sorting and Searching,https://cses.fi/problemset/task/1073
+1074,Stick Lengths,Sorting and Searching,https://cses.fi/problemset/task/1074
+1075,Counting Permutations,Counting Problems,https://cses.fi/problemset/task/1075
+1076,Sliding Window Median,Sliding Window Problems,https://cses.fi/problemset/task/1076
+1077,Sliding Window Cost,Sliding Window Problems,https://cses.fi/problemset/task/1077
+1078,Grid Paths II,Counting Problems,https://cses.fi/problemset/task/1078
+1079,Binomial Coefficients,Mathematics,https://cses.fi/problemset/task/1079
+1080,Empty String,Counting Problems,https://cses.fi/problemset/task/1080
+1081,Common Divisors,Mathematics,https://cses.fi/problemset/task/1081
+1082,Sum of Divisors,Mathematics,https://cses.fi/problemset/task/1082
+1083,Missing Number,Introductory Problems,https://cses.fi/problemset/task/1083
+1084,Apartments,Sorting and Searching,https://cses.fi/problemset/task/1084
+1085,Array Division,Sorting and Searching,https://cses.fi/problemset/task/1085
+1086,Writing Numbers,Additional Problems I,https://cses.fi/problemset/task/1086
+1087,Shortest Subsequence,Additional Problems I,https://cses.fi/problemset/task/1087
+1090,Ferris Wheel,Sorting and Searching,https://cses.fi/problemset/task/1090
+1091,Concert Tickets,Sorting and Searching,https://cses.fi/problemset/task/1091
+1092,Two Sets,Introductory Problems,https://cses.fi/problemset/task/1092
+1093,Two Sets II,Dynamic Programming,https://cses.fi/problemset/task/1093
+1094,Increasing Array,Introductory Problems,https://cses.fi/problemset/task/1094
+1095,Exponentiation,Mathematics,https://cses.fi/problemset/task/1095
+1096,Throwing Dice,Mathematics,https://cses.fi/problemset/task/1096
+1097,Removal Game,Dynamic Programming,https://cses.fi/problemset/task/1097
+1098,Nim Game II,Mathematics,https://cses.fi/problemset/task/1098
+1099,Stair Game,Mathematics,https://cses.fi/problemset/task/1099
+1110,Minimal Rotation,String Algorithms,https://cses.fi/problemset/task/1110
+1111,Longest Palindrome,String Algorithms,https://cses.fi/problemset/task/1111
+1112,Required Substring,String Algorithms,https://cses.fi/problemset/task/1112
+1113,String Transform,String Algorithms,https://cses.fi/problemset/task/1113
+1130,Tree Matching,Tree Algorithms,https://cses.fi/problemset/task/1130
+1131,Tree Diameter,Tree Algorithms,https://cses.fi/problemset/task/1131
+1132,Tree Distances I,Tree Algorithms,https://cses.fi/problemset/task/1132
+1133,Tree Distances II,Tree Algorithms,https://cses.fi/problemset/task/1133
+1134,Prüfer Code,Advanced Graph Problems,https://cses.fi/problemset/task/1134
+1135,Distance Queries,Tree Algorithms,https://cses.fi/problemset/task/1135
+1136,Counting Paths,Tree Algorithms,https://cses.fi/problemset/task/1136
+1137,Subtree Queries,Tree Algorithms,https://cses.fi/problemset/task/1137
+1138,Path Queries,Tree Algorithms,https://cses.fi/problemset/task/1138
+1139,Distinct Colors,Tree Algorithms,https://cses.fi/problemset/task/1139
+1140,Projects,Dynamic Programming,https://cses.fi/problemset/task/1140
+1141,Playlist,Sorting and Searching,https://cses.fi/problemset/task/1141
+1142,Advertisement,Additional Problems I,https://cses.fi/problemset/task/1142
+1143,Hotel Queries,Range Queries,https://cses.fi/problemset/task/1143
+1144,Salary Queries,Range Queries,https://cses.fi/problemset/task/1144
+1145,Increasing Subsequence,Dynamic Programming,https://cses.fi/problemset/task/1145
+1146,Counting Bits,Bitwise Operations,https://cses.fi/problemset/task/1146
+1147,Maximum Building I,Additional Problems I,https://cses.fi/problemset/task/1147
+1148,Maximum Building II,Additional Problems II,https://cses.fi/problemset/task/1148
+1149,Distinct Subsequences,String Algorithms,https://cses.fi/problemset/task/1149
+1157,Mex Grid Queries,Additional Problems II,https://cses.fi/problemset/task/1157
+1158,Book Shop,Dynamic Programming,https://cses.fi/problemset/task/1158
+1159,Book Shop II,Additional Problems II,https://cses.fi/problemset/task/1159
+1160,Planets Queries II,Graph Algorithms,https://cses.fi/problemset/task/1160
+1161,Stick Divisions,Additional Problems II,https://cses.fi/problemset/task/1161
+1162,Sorting Methods,Additional Problems I,https://cses.fi/problemset/task/1162
+1163,Traffic Lights,Sorting and Searching,https://cses.fi/problemset/task/1163
+1164,Room Allocation,Sorting and Searching,https://cses.fi/problemset/task/1164
+1188,Bit Inversions,Additional Problems I,https://cses.fi/problemset/task/1188
+1189,Food Division,Additional Problems II,https://cses.fi/problemset/task/1189
+1190,Subarray Sum Queries,Range Queries,https://cses.fi/problemset/task/1190
+1191,Cyclic Array,Additional Problems I,https://cses.fi/problemset/task/1191
+1192,Counting Rooms,Graph Algorithms,https://cses.fi/problemset/task/1192
+1193,Labyrinth,Graph Algorithms,https://cses.fi/problemset/task/1193
+1194,Monsters,Graph Algorithms,https://cses.fi/problemset/task/1194
+1195,Flight Discount,Graph Algorithms,https://cses.fi/problemset/task/1195
+1196,Flight Routes,Graph Algorithms,https://cses.fi/problemset/task/1196
+1197,Cycle Finding,Graph Algorithms,https://cses.fi/problemset/task/1197
+1202,Investigation,Graph Algorithms,https://cses.fi/problemset/task/1202
+1203,Visiting Cities,Advanced Graph Problems,https://cses.fi/problemset/task/1203
+1617,Bit Strings,Introductory Problems,https://cses.fi/problemset/task/1617
+1618,Trailing Zeros,Introductory Problems,https://cses.fi/problemset/task/1618
+1619,Restaurant Customers,Sorting and Searching,https://cses.fi/problemset/task/1619
+1620,Factory Machines,Sorting and Searching,https://cses.fi/problemset/task/1620
+1621,Distinct Numbers,Sorting and Searching,https://cses.fi/problemset/task/1621
+1622,Creating Strings,Introductory Problems,https://cses.fi/problemset/task/1622
+1623,Apple Division,Introductory Problems,https://cses.fi/problemset/task/1623
+1624,Chessboard and Queens,Introductory Problems,https://cses.fi/problemset/task/1624
+1625,Grid Path Description,Introductory Problems,https://cses.fi/problemset/task/1625
+1628,Meet in the Middle,Advanced Techniques,https://cses.fi/problemset/task/1628
+1629,Movie Festival,Sorting and Searching,https://cses.fi/problemset/task/1629
+1630,Tasks and Deadlines,Sorting and Searching,https://cses.fi/problemset/task/1630
+1631,Reading Books,Sorting and Searching,https://cses.fi/problemset/task/1631
+1632,Movie Festival II,Sorting and Searching,https://cses.fi/problemset/task/1632
+1633,Dice Combinations,Dynamic Programming,https://cses.fi/problemset/task/1633
+1634,Minimizing Coins,Dynamic Programming,https://cses.fi/problemset/task/1634
+1635,Coin Combinations I,Dynamic Programming,https://cses.fi/problemset/task/1635
+1636,Coin Combinations II,Dynamic Programming,https://cses.fi/problemset/task/1636
+1637,Removing Digits,Dynamic Programming,https://cses.fi/problemset/task/1637
+1638,Grid Paths I,Dynamic Programming,https://cses.fi/problemset/task/1638
+1639,Edit Distance,Dynamic Programming,https://cses.fi/problemset/task/1639
+1640,Sum of Two Values,Sorting and Searching,https://cses.fi/problemset/task/1640
+1641,Sum of Three Values,Sorting and Searching,https://cses.fi/problemset/task/1641
+1642,Sum of Four Values,Sorting and Searching,https://cses.fi/problemset/task/1642
+1643,Maximum Subarray Sum,Sorting and Searching,https://cses.fi/problemset/task/1643
+1644,Maximum Subarray Sum II,Sorting and Searching,https://cses.fi/problemset/task/1644
+1645,Nearest Smaller Values,Sorting and Searching,https://cses.fi/problemset/task/1645
+1646,Static Range Sum Queries,Range Queries,https://cses.fi/problemset/task/1646
+1647,Static Range Minimum Queries,Range Queries,https://cses.fi/problemset/task/1647
+1648,Dynamic Range Sum Queries,Range Queries,https://cses.fi/problemset/task/1648
+1649,Dynamic Range Minimum Queries,Range Queries,https://cses.fi/problemset/task/1649
+1650,Range Xor Queries,Range Queries,https://cses.fi/problemset/task/1650
+1651,Range Update Queries,Range Queries,https://cses.fi/problemset/task/1651
+1652,Forest Queries,Range Queries,https://cses.fi/problemset/task/1652
+1653,Elevator Rides,Dynamic Programming,https://cses.fi/problemset/task/1653
+1654,SOS Bit Problem,Bitwise Operations,https://cses.fi/problemset/task/1654
+1655,Maximum Xor Subarray,Bitwise Operations,https://cses.fi/problemset/task/1655
+1660,Subarray Sums I,Sorting and Searching,https://cses.fi/problemset/task/1660
+1661,Subarray Sums II,Sorting and Searching,https://cses.fi/problemset/task/1661
+1662,Subarray Divisibility,Sorting and Searching,https://cses.fi/problemset/task/1662
+1664,Movie Festival Queries,Range Queries,https://cses.fi/problemset/task/1664
+1665,Coding Company,Additional Problems II,https://cses.fi/problemset/task/1665
+1666,Building Roads,Graph Algorithms,https://cses.fi/problemset/task/1666
+1667,Message Route,Graph Algorithms,https://cses.fi/problemset/task/1667
+1668,Building Teams,Graph Algorithms,https://cses.fi/problemset/task/1668
+1669,Round Trip,Graph Algorithms,https://cses.fi/problemset/task/1669
+1670,Swap Game,Additional Problems I,https://cses.fi/problemset/task/1670
+1671,Shortest Routes I,Graph Algorithms,https://cses.fi/problemset/task/1671
+1672,Shortest Routes II,Graph Algorithms,https://cses.fi/problemset/task/1672
+1673,High Score,Graph Algorithms,https://cses.fi/problemset/task/1673
+1674,Subordinates,Tree Algorithms,https://cses.fi/problemset/task/1674
+1675,Road Reparation,Graph Algorithms,https://cses.fi/problemset/task/1675
+1676,Road Construction,Graph Algorithms,https://cses.fi/problemset/task/1676
+1677,Network Breakdown,Advanced Graph Problems,https://cses.fi/problemset/task/1677
+1678,Round Trip II,Graph Algorithms,https://cses.fi/problemset/task/1678
+1679,Course Schedule,Graph Algorithms,https://cses.fi/problemset/task/1679
+1680,Longest Flight Route,Graph Algorithms,https://cses.fi/problemset/task/1680
+1681,Game Routes,Graph Algorithms,https://cses.fi/problemset/task/1681
+1682,Flight Routes Check,Graph Algorithms,https://cses.fi/problemset/task/1682
+1683,Planets and Kingdoms,Graph Algorithms,https://cses.fi/problemset/task/1683
+1684,Giant Pizza,Graph Algorithms,https://cses.fi/problemset/task/1684
+1685,New Flight Routes,Advanced Graph Problems,https://cses.fi/problemset/task/1685
+1686,Coin Collector,Graph Algorithms,https://cses.fi/problemset/task/1686
+1687,Company Queries I,Tree Algorithms,https://cses.fi/problemset/task/1687
+1688,Company Queries II,Tree Algorithms,https://cses.fi/problemset/task/1688
+1689,Knight's Tour,Graph Algorithms,https://cses.fi/problemset/task/1689
+1690,Hamiltonian Flights,Graph Algorithms,https://cses.fi/problemset/task/1690
+1691,Mail Delivery,Graph Algorithms,https://cses.fi/problemset/task/1691
+1692,De Bruijn Sequence,Graph Algorithms,https://cses.fi/problemset/task/1692
+1693,Teleporters Path,Graph Algorithms,https://cses.fi/problemset/task/1693
+1694,Download Speed,Graph Algorithms,https://cses.fi/problemset/task/1694
+1695,Police Chase,Graph Algorithms,https://cses.fi/problemset/task/1695
+1696,School Dance,Graph Algorithms,https://cses.fi/problemset/task/1696
+1697,Chess Tournament,Construction Problems,https://cses.fi/problemset/task/1697
+1698,Swap Round Sorting,Additional Problems II,https://cses.fi/problemset/task/1698
+1699,Flight Route Requests,Advanced Graph Problems,https://cses.fi/problemset/task/1699
+1700,Tree Isomorphism I,Advanced Graph Problems,https://cses.fi/problemset/task/1700
+1701,Tree Isomorphism II,Advanced Graph Problems,https://cses.fi/problemset/task/1701
+1702,Tree Traversals,Advanced Graph Problems,https://cses.fi/problemset/task/1702
+1703,Critical Cities,Advanced Graph Problems,https://cses.fi/problemset/task/1703
+1704,Network Renovation,Advanced Graph Problems,https://cses.fi/problemset/task/1704
+1705,Forbidden Cities,Advanced Graph Problems,https://cses.fi/problemset/task/1705
+1706,School Excursion,Additional Problems II,https://cses.fi/problemset/task/1706
+1707,Graph Girth,Advanced Graph Problems,https://cses.fi/problemset/task/1707
+1709,Coin Grid,Additional Problems II,https://cses.fi/problemset/task/1709
+1711,Distinct Routes,Graph Algorithms,https://cses.fi/problemset/task/1711
+1712,Exponentiation II,Mathematics,https://cses.fi/problemset/task/1712
+1713,Counting Divisors,Mathematics,https://cses.fi/problemset/task/1713
+1715,Creating Strings II,Mathematics,https://cses.fi/problemset/task/1715
+1716,Distributing Apples,Mathematics,https://cses.fi/problemset/task/1716
+1717,Christmas Party,Mathematics,https://cses.fi/problemset/task/1717
+1722,Fibonacci Numbers,Mathematics,https://cses.fi/problemset/task/1722
+1723,Graph Paths I,Mathematics,https://cses.fi/problemset/task/1723
+1724,Graph Paths II,Mathematics,https://cses.fi/problemset/task/1724
+1725,Dice Probability,Mathematics,https://cses.fi/problemset/task/1725
+1726,Moving Robots,Mathematics,https://cses.fi/problemset/task/1726
+1727,Candy Lottery,Mathematics,https://cses.fi/problemset/task/1727
+1728,Inversion Probability,Mathematics,https://cses.fi/problemset/task/1728
+1729,Stick Game,Mathematics,https://cses.fi/problemset/task/1729
+1730,Nim Game I,Mathematics,https://cses.fi/problemset/task/1730
+1731,Word Combinations,String Algorithms,https://cses.fi/problemset/task/1731
+1732,Finding Borders,String Algorithms,https://cses.fi/problemset/task/1732
+1733,Finding Periods,String Algorithms,https://cses.fi/problemset/task/1733
+1734,Distinct Values Queries,Range Queries,https://cses.fi/problemset/task/1734
+1735,Range Updates and Sums,Range Queries,https://cses.fi/problemset/task/1735
+1736,Polynomial Queries,Range Queries,https://cses.fi/problemset/task/1736
+1737,Range Queries and Copies,Range Queries,https://cses.fi/problemset/task/1737
+1739,Forest Queries II,Range Queries,https://cses.fi/problemset/task/1739
+1740,Intersection Points,Geometry,https://cses.fi/problemset/task/1740
+1741,Area of Rectangles,Geometry,https://cses.fi/problemset/task/1741
+1742,Robot Path,Geometry,https://cses.fi/problemset/task/1742
+1743,String Reorder,Introductory Problems,https://cses.fi/problemset/task/1743
+1744,Rectangle Cutting,Dynamic Programming,https://cses.fi/problemset/task/1744
+1745,Money Sums,Dynamic Programming,https://cses.fi/problemset/task/1745
+1746,Array Description,Dynamic Programming,https://cses.fi/problemset/task/1746
+1747,Pyramid Array,Additional Problems I,https://cses.fi/problemset/task/1747
+1748,Increasing Subsequence II,Dynamic Programming,https://cses.fi/problemset/task/1748
+1749,List Removals,Range Queries,https://cses.fi/problemset/task/1749
+1750,Planets Queries I,Graph Algorithms,https://cses.fi/problemset/task/1750
+1751,Planets Cycles,Graph Algorithms,https://cses.fi/problemset/task/1751
+1752,Creating Offices,Advanced Graph Problems,https://cses.fi/problemset/task/1752
+1753,String Matching,String Algorithms,https://cses.fi/problemset/task/1753
+1754,Coin Piles,Introductory Problems,https://cses.fi/problemset/task/1754
+1755,Palindrome Reorder,Introductory Problems,https://cses.fi/problemset/task/1755
+1756,Acyclic Graph Edges,Advanced Graph Problems,https://cses.fi/problemset/task/1756
+1757,Course Schedule II,Advanced Graph Problems,https://cses.fi/problemset/task/1757
+2064,Bracket Sequences I,Mathematics,https://cses.fi/problemset/task/2064
+2072,Cut and Paste,Advanced Techniques,https://cses.fi/problemset/task/2072
+2073,Substring Reversals,Advanced Techniques,https://cses.fi/problemset/task/2073
+2074,Reversals and Sums,Advanced Techniques,https://cses.fi/problemset/task/2074
+2075,Reversal Sorting,Additional Problems II,https://cses.fi/problemset/task/2075
+2076,Necessary Roads,Advanced Techniques,https://cses.fi/problemset/task/2076
+2077,Necessary Cities,Advanced Techniques,https://cses.fi/problemset/task/2077
+2078,Eulerian Subgraphs,Advanced Techniques,https://cses.fi/problemset/task/2078
+2079,Finding a Centroid,Tree Algorithms,https://cses.fi/problemset/task/2079
+2080,Fixed-Length Paths I,Tree Algorithms,https://cses.fi/problemset/task/2080
+2081,Fixed-Length Paths II,Tree Algorithms,https://cses.fi/problemset/task/2081
+2084,Monster Game I,Advanced Techniques,https://cses.fi/problemset/task/2084
+2085,Monster Game II,Advanced Techniques,https://cses.fi/problemset/task/2085
+2086,Subarray Squares,Advanced Techniques,https://cses.fi/problemset/task/2086
+2087,Houses and Schools,Advanced Techniques,https://cses.fi/problemset/task/2087
+2088,Knuth Division,Advanced Techniques,https://cses.fi/problemset/task/2088
+2101,New Roads Queries,Advanced Techniques,https://cses.fi/problemset/task/2101
+2102,Finding Patterns,String Algorithms,https://cses.fi/problemset/task/2102
+2103,Counting Patterns,String Algorithms,https://cses.fi/problemset/task/2103
+2104,Pattern Positions,String Algorithms,https://cses.fi/problemset/task/2104
+2105,Distinct Substrings,String Algorithms,https://cses.fi/problemset/task/2105
+2106,Repeating Substring,String Algorithms,https://cses.fi/problemset/task/2106
+2107,String Functions,String Algorithms,https://cses.fi/problemset/task/2107
+2108,Substring Order I,String Algorithms,https://cses.fi/problemset/task/2108
+2109,Substring Order II,String Algorithms,https://cses.fi/problemset/task/2109
+2110,Substring Distribution,String Algorithms,https://cses.fi/problemset/task/2110
+2111,Apples and Bananas,Advanced Techniques,https://cses.fi/problemset/task/2111
+2112,One Bit Positions,Advanced Techniques,https://cses.fi/problemset/task/2112
+2113,Signal Processing,Advanced Techniques,https://cses.fi/problemset/task/2113
+2115,Bit Substrings,Additional Problems II,https://cses.fi/problemset/task/2115
+2121,Parcel Delivery,Advanced Techniques,https://cses.fi/problemset/task/2121
+2129,Task Assignment,Advanced Techniques,https://cses.fi/problemset/task/2129
+2130,Distinct Routes II,Advanced Techniques,https://cses.fi/problemset/task/2130
+2131,Grid Puzzle II,Additional Problems II,https://cses.fi/problemset/task/2131
+2132,Increasing Array II,Additional Problems II,https://cses.fi/problemset/task/2132
+2133,Dynamic Connectivity,Advanced Techniques,https://cses.fi/problemset/task/2133
+2134,Path Queries II,Tree Algorithms,https://cses.fi/problemset/task/2134
+2136,Hamming Distance,Advanced Techniques,https://cses.fi/problemset/task/2136
+2137,Corner Subgrid Count,Advanced Techniques,https://cses.fi/problemset/task/2137
+2138,Reachable Nodes,Advanced Techniques,https://cses.fi/problemset/task/2138
+2143,Reachability Queries,Advanced Techniques,https://cses.fi/problemset/task/2143
+2162,Josephus Problem I,Sorting and Searching,https://cses.fi/problemset/task/2162
+2163,Josephus Problem II,Sorting and Searching,https://cses.fi/problemset/task/2163
+2164,Josephus Queries,Mathematics,https://cses.fi/problemset/task/2164
+2165,Tower of Hanoi,Introductory Problems,https://cses.fi/problemset/task/2165
+2166,Prefix Sum Queries,Range Queries,https://cses.fi/problemset/task/2166
+2168,Nested Ranges Check,Sorting and Searching,https://cses.fi/problemset/task/2168
+2169,Nested Ranges Count,Sorting and Searching,https://cses.fi/problemset/task/2169
+2174,Removing Digits II,Additional Problems II,https://cses.fi/problemset/task/2174
+2176,Counting Bishops,Counting Problems,https://cses.fi/problemset/task/2176
+2177,Strongly Connected Edges,Advanced Graph Problems,https://cses.fi/problemset/task/2177
+2179,Even Outdegree Edges,Advanced Graph Problems,https://cses.fi/problemset/task/2179
+2180,Coin Arrangement,Additional Problems II,https://cses.fi/problemset/task/2180
+2181,Counting Tilings,Dynamic Programming,https://cses.fi/problemset/task/2181
+2182,Divisor Analysis,Mathematics,https://cses.fi/problemset/task/2182
+2183,Missing Coin Sum,Sorting and Searching,https://cses.fi/problemset/task/2183
+2184,Missing Coin Sum Queries,Range Queries,https://cses.fi/problemset/task/2184
+2185,Prime Multiples,Mathematics,https://cses.fi/problemset/task/2185
+2186,Special Substrings,Additional Problems I,https://cses.fi/problemset/task/2186
+2187,Bracket Sequences II,Mathematics,https://cses.fi/problemset/task/2187
+2189,Point Location Test,Geometry,https://cses.fi/problemset/task/2189
+2190,Line Segment Intersection,Geometry,https://cses.fi/problemset/task/2190
+2191,Polygon Area,Geometry,https://cses.fi/problemset/task/2191
+2192,Point in Polygon,Geometry,https://cses.fi/problemset/task/2192
+2193,Polygon Lattice Points,Geometry,https://cses.fi/problemset/task/2193
+2194,Minimum Euclidean Distance,Geometry,https://cses.fi/problemset/task/2194
+2195,Convex Hull,Geometry,https://cses.fi/problemset/task/2195
+2205,Gray Code,Introductory Problems,https://cses.fi/problemset/task/2205
+2206,Pizzeria Queries,Range Queries,https://cses.fi/problemset/task/2206
+2207,Grundy's Game,Mathematics,https://cses.fi/problemset/task/2207
+2208,Another Game,Mathematics,https://cses.fi/problemset/task/2208
+2209,Counting Necklaces,Mathematics,https://cses.fi/problemset/task/2209
+2210,Counting Grids,Mathematics,https://cses.fi/problemset/task/2210
+2214,Inverse Inversions,Construction Problems,https://cses.fi/problemset/task/2214
+2215,Monotone Subsequences,Construction Problems,https://cses.fi/problemset/task/2215
+2216,Collecting Numbers,Sorting and Searching,https://cses.fi/problemset/task/2216
+2217,Collecting Numbers II,Sorting and Searching,https://cses.fi/problemset/task/2217
+2220,Counting Numbers,Dynamic Programming,https://cses.fi/problemset/task/2220
+2228,Counting Sequences,Counting Problems,https://cses.fi/problemset/task/2228
+2229,Permutation Inversions,Counting Problems,https://cses.fi/problemset/task/2229
+2402,Two Stacks Sorting,Additional Problems II,https://cses.fi/problemset/task/2402
+2413,Counting Towers,Dynamic Programming,https://cses.fi/problemset/task/2413
+2414,List of Sums,Additional Problems I,https://cses.fi/problemset/task/2414
+2415,Functional Graph Distribution,Counting Problems,https://cses.fi/problemset/task/2415
+2416,Increasing Array Queries,Range Queries,https://cses.fi/problemset/task/2416
+2417,Counting Coprime Pairs,Mathematics,https://cses.fi/problemset/task/2417
+2418,Grid Path Construction,Construction Problems,https://cses.fi/problemset/task/2418
+2419,Xor Pyramid Peak,Bitwise Operations,https://cses.fi/problemset/task/2419
+2420,Palindrome Queries,String Algorithms,https://cses.fi/problemset/task/2420
+2421,Counting Reorders,Counting Problems,https://cses.fi/problemset/task/2421
+2422,Multiplication Table,Additional Problems I,https://cses.fi/problemset/task/2422
+2423,Filling Trominos,Construction Problems,https://cses.fi/problemset/task/2423
+2425,Stack Weights,Additional Problems I,https://cses.fi/problemset/task/2425
+2426,Programmers and Artists,Additional Problems II,https://cses.fi/problemset/task/2426
+2427,Letter Pair Move Game,Additional Problems I,https://cses.fi/problemset/task/2427
+2428,Distinct Values Subarrays II,Sorting and Searching,https://cses.fi/problemset/task/2428
+2429,Grid Completion,Counting Problems,https://cses.fi/problemset/task/2429
+2430,Binary Subsequences,Additional Problems II,https://cses.fi/problemset/task/2430
+2431,Digit Queries,Introductory Problems,https://cses.fi/problemset/task/2431
+2432,Grid Puzzle I,Additional Problems II,https://cses.fi/problemset/task/2432
+3108,K Subset Sums I,Additional Problems II,https://cses.fi/problemset/task/3108
+3109,K Subset Sums II,Additional Problems II,https://cses.fi/problemset/task/3109
+3111,Transfer Speeds Sum,Advanced Graph Problems,https://cses.fi/problemset/task/3111
+3112,Hidden Integer,Interactive Problems,https://cses.fi/problemset/task/3112
+3114,Tree Coin Collecting I,Advanced Graph Problems,https://cses.fi/problemset/task/3114
+3138,All Palindromes,String Algorithms,https://cses.fi/problemset/task/3138
+3139,Hidden Permutation,Interactive Problems,https://cses.fi/problemset/task/3139
+3140,Inversion Sorting,Interactive Problems,https://cses.fi/problemset/task/3140
+3141,And Subset Count,Bitwise Operations,https://cses.fi/problemset/task/3141
+3149,Tree Coin Collecting II,Advanced Graph Problems,https://cses.fi/problemset/task/3149
+3150,Distinct Values Sum,Additional Problems I,https://cses.fi/problemset/task/3150
+3151,Bubble Sort Rounds I,Additional Problems I,https://cses.fi/problemset/task/3151
+3152,Bubble Sort Rounds II,Additional Problems I,https://cses.fi/problemset/task/3152
+3154,System of Linear Equations,Mathematics,https://cses.fi/problemset/task/3154
+3157,Collecting Numbers Distribution,Counting Problems,https://cses.fi/problemset/task/3157
+3158,Bus Companies,Advanced Graph Problems,https://cses.fi/problemset/task/3158
+3159,Replace with Difference,Additional Problems II,https://cses.fi/problemset/task/3159
+3161,GCD Subsets,Additional Problems II,https://cses.fi/problemset/task/3161
+3163,Range Interval Queries,Range Queries,https://cses.fi/problemset/task/3163
+3169,Counting LCM Arrays,Additional Problems I,https://cses.fi/problemset/task/3169
+3175,Beautiful Permutation II,Additional Problems I,https://cses.fi/problemset/task/3175
+3190,Distinct Values Splits,Additional Problems I,https://cses.fi/problemset/task/3190
+3191,Maximum Xor Subset,Bitwise Operations,https://cses.fi/problemset/task/3191
+3192,K Subset Xors,Bitwise Operations,https://cses.fi/problemset/task/3192
+3193,Square Subsets,Additional Problems I,https://cses.fi/problemset/task/3193
+3194,Xor Pyramid Diagonal,Bitwise Operations,https://cses.fi/problemset/task/3194
+3195,Xor Pyramid Row,Bitwise Operations,https://cses.fi/problemset/task/3195
+3211,Number of Subset Xors,Bitwise Operations,https://cses.fi/problemset/task/3211
+3213,Water Containers Moves,Additional Problems I,https://cses.fi/problemset/task/3213
+3214,Water Containers Queries,Additional Problems I,https://cses.fi/problemset/task/3214
+3215,Bouncing Ball Steps,Additional Problems II,https://cses.fi/problemset/task/3215
+3216,Bouncing Ball Cycle,Additional Problems II,https://cses.fi/problemset/task/3216
+3217,Knight Moves Grid,Introductory Problems,https://cses.fi/problemset/task/3217
+3218,Knight Moves Queries,Additional Problems II,https://cses.fi/problemset/task/3218
+3219,Sliding Window Mex,Sliding Window Problems,https://cses.fi/problemset/task/3219
+3220,Sliding Window Sum,Sliding Window Problems,https://cses.fi/problemset/task/3220
+3221,Sliding Window Minimum,Sliding Window Problems,https://cses.fi/problemset/task/3221
+3222,Sliding Window Distinct Values,Sliding Window Problems,https://cses.fi/problemset/task/3222
+3223,Sliding Window Inversions,Sliding Window Problems,https://cses.fi/problemset/task/3223
+3224,Sliding Window Mode,Sliding Window Problems,https://cses.fi/problemset/task/3224
+3225,Inverse Suffix Array,String Algorithms,https://cses.fi/problemset/task/3225
+3226,Subarray Sum Queries II,Range Queries,https://cses.fi/problemset/task/3226
+3227,Sliding Window Advertisement,Sliding Window Problems,https://cses.fi/problemset/task/3227
+3228,Permuted Binary Strings,Interactive Problems,https://cses.fi/problemset/task/3228
+3232,Tournament Graph Distribution,Counting Problems,https://cses.fi/problemset/task/3232
+3233,All Subarray Xors,Bitwise Operations,https://cses.fi/problemset/task/3233
+3273,Colored Chairs,Interactive Problems,https://cses.fi/problemset/task/3273
+3294,Subarray Sum Constraints,Additional Problems I,https://cses.fi/problemset/task/3294
+3301,Maximum Average Subarrays,Additional Problems I,https://cses.fi/problemset/task/3301
+3302,Subsets with Fixed Average,Additional Problems I,https://cses.fi/problemset/task/3302
+3303,Nearest Shops,Advanced Graph Problems,https://cses.fi/problemset/task/3303
+3304,Visible Buildings Queries,Range Queries,https://cses.fi/problemset/task/3304
+3305,K-th Highest Score,Interactive Problems,https://cses.fi/problemset/task/3305
+3306,Nearest Campsites I,Additional Problems I,https://cses.fi/problemset/task/3306
+3307,Nearest Campsites II,Additional Problems I,https://cses.fi/problemset/task/3307
+3308,Graph Coloring,Advanced Graph Problems,https://cses.fi/problemset/task/3308
+3311,Grid Coloring I,Introductory Problems,https://cses.fi/problemset/task/3311
+3312,Grid Coloring II,Additional Problems II,https://cses.fi/problemset/task/3312
+3314,Mountain Range,Dynamic Programming,https://cses.fi/problemset/task/3314
+3355,Sum of Four Squares,Mathematics,https://cses.fi/problemset/task/3355
+3356,Distinct Values Queries II,Range Queries,https://cses.fi/problemset/task/3356
+3357,Fixed Length Walk Queries,Advanced Graph Problems,https://cses.fi/problemset/task/3357
+3358,Split into Two Paths,Advanced Graph Problems,https://cses.fi/problemset/task/3358
+3359,Minimal Grid Path,Dynamic Programming,https://cses.fi/problemset/task/3359
+3360,Corner Subgrid Check,Advanced Techniques,https://cses.fi/problemset/task/3360
+3361,Two Array Average,Additional Problems I,https://cses.fi/problemset/task/3361
+3396,Next Prime,Mathematics,https://cses.fi/problemset/task/3396
+3397,Permutation Order,Mathematics,https://cses.fi/problemset/task/3397
+3398,Permutation Rounds,Mathematics,https://cses.fi/problemset/task/3398
+3399,Raab Game I,Introductory Problems,https://cses.fi/problemset/task/3399
+3400,Raab Game II,Counting Problems,https://cses.fi/problemset/task/3400
+3401,Stick Difference,Additional Problems II,https://cses.fi/problemset/task/3401
+3402,Minimum Cost Pairs,Additional Problems II,https://cses.fi/problemset/task/3402
+3403,Longest Common Subsequence,Dynamic Programming,https://cses.fi/problemset/task/3403
+3404,Permutation Subsequence,Additional Problems I,https://cses.fi/problemset/task/3404
+3405,Sliding Window Or,Sliding Window Problems,https://cses.fi/problemset/task/3405
+3406,Triangle Number Sums,Mathematics,https://cses.fi/problemset/task/3406
+3407,MST Edge Check,Advanced Graph Problems,https://cses.fi/problemset/task/3407
+3408,MST Edge Set Check,Advanced Graph Problems,https://cses.fi/problemset/task/3408
+3409,MST Edge Cost,Advanced Graph Problems,https://cses.fi/problemset/task/3409
+3410,Maximum Manhattan Distances,Geometry,https://cses.fi/problemset/task/3410
+3411,All Manhattan Distances,Geometry,https://cses.fi/problemset/task/3411
+3413,Filled Subgrid Count I,Counting Problems,https://cses.fi/problemset/task/3413
+3414,Filled Subgrid Count II,Counting Problems,https://cses.fi/problemset/task/3414
+3415,All Letter Subgrid Count I,Counting Problems,https://cses.fi/problemset/task/3415
+3416,All Letter Subgrid Count II,Counting Problems,https://cses.fi/problemset/task/3416
+3417,Border Subgrid Count I,Counting Problems,https://cses.fi/problemset/task/3417
+3418,Border Subgrid Count II,Counting Problems,https://cses.fi/problemset/task/3418
+3419,Mex Grid Construction,Introductory Problems,https://cses.fi/problemset/task/3419
+3420,Distinct Values Subarrays,Sorting and Searching,https://cses.fi/problemset/task/3420
+3421,Distinct Values Subsequences,Sorting and Searching,https://cses.fi/problemset/task/3421
+3422,Third Permutation,Construction Problems,https://cses.fi/problemset/task/3422
+3423,Permutation Prime Sums,Construction Problems,https://cses.fi/problemset/task/3423
+3424,Distinct Sums Grid,Construction Problems,https://cses.fi/problemset/task/3424
+3425,Same Sum Subsets,Additional Problems II,https://cses.fi/problemset/task/3425
+3426,Sliding Window Xor,Sliding Window Problems,https://cses.fi/problemset/task/3426
+3427,Line Segments Trace I,Geometry,https://cses.fi/problemset/task/3427
+3428,Line Segments Trace II,Geometry,https://cses.fi/problemset/task/3428
+3429,Lines and Queries I,Geometry,https://cses.fi/problemset/task/3429
+3430,Lines and Queries II,Geometry,https://cses.fi/problemset/task/3430
