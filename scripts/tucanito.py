@@ -259,9 +259,10 @@ async def set_reminder(update: Update, context: ContextTypes.DEFAULT_TYPE):
         time = args[0]
         days_display = "todos os dias"
     else:
-        # Dias específicos
-        days_str = args[0].lower().replace(" ", "")
-        days_list = days_str.split(",")
+        # Dias específicos (junta tudo antes do horário, pois o Telegram
+        # já separa por espaço, mesmo quando há espaço depois da vírgula)
+        days_str = "".join(args[:-1]).lower().replace(" ", "")
+        days_list = [d for d in days_str.split(",") if d]
         
         # Converte para inglês usando o mapeamento
         days = []
