@@ -283,7 +283,7 @@ async def set_reminder(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
             return
         
-        time = args[1]
+        time = args[-1]
         # Mostra os dias em português para confirmação
         days_display = ", ".join([DAYS_PT[d] for d in days])
     
