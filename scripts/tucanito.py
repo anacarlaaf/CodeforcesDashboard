@@ -8,6 +8,7 @@ sys.path.insert(0, str(project_root))
 
 import datetime
 import time
+import random
 import logging
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes, CallbackQueryHandler
@@ -61,6 +62,13 @@ COMMANDS = {
     "remove_all": "Remover todos os lembretes",
     "help": "Mostrar esta mensagem"
 }
+
+MOTIVATIONAL_MESSAGES = [
+    "Seu rating do CF não vai subir sozinho 📈",
+    "Não deixe outra equipe pegar a vaga do seu time na Nacional ☝",
+    "Sua medalha e vaga na LATAM estão te esperando. Só depende de você! 🏅",
+    "Malhar o cérebro faz bem! Que tal estudar um novo tópico e resolver alguns problemas? 💪🧠",
+]
 
 def get_timezones():
     """Retorna lista de timezones comuns para o Brasil"""
@@ -448,30 +456,24 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         f"👋 Olá, {user_data.handle}! 👋\n\n"
         "Não entendi sua mensagem, mas estou aqui para ajudar!\n\n"
-        "Use /help para ver todos os comandos disponíveis ou me envie:\n"
-        "• /set_reminder para configurar lembretes\n"
-        "• /list_reminders para ver seus lembretes"
+        "Use /help para ver todos os comandos disponíveis.\n"
     )
 
 def format_daily_stats(total_accepted: int, days_with_submission: int, handle: str) -> str:
     """Formata as estatísticas diárias para a mensagem"""
     if total_accepted >= 1:
         if total_accepted == 1:
-            msg = f"🎉 Parabéns, {handle}! Você resolveu {total_accepted} questão hoje!"
+            msg = f"Legal! Você já resolveu {total_accepted} questão hoje. Que tal fazer mais algumas? ✨"
         else:
-            msg = f"🎉 Parabéns, {handle}! Você resolveu {total_accepted} questões hoje!"
+            msg = f"Arrasou! Você já resolveu {total_accepted} questões hoje. Duvidei fazer mais uma mais difícil! 🔥"
         
-        if days_with_submission >= 1:
-            msg += f"\n📊 Você treinou em {days_with_submission} dia(s)!"
-        
-        msg += "\n\nContinue assim! 💪🚀"
+        msg += "\n\nLembre-se de resolver pelo menos 1 questão por dia! 🚀"
     
     else:
-        msg = f"😢 Que pena, {handle}! Hoje você não resolveu nenhuma questão."
-        msg += "\n\n📝 Dica: Tente resolver pelo menos 1 questão por dia!"
-        msg += "\nMesmo uma questão já faz diferença! 🧠"
-        msg += "\n\nVamos melhorar amanhã! 💪"
-    
+        msg = f"Você ainda não nenhuma questão hoje..."
+        
+        msg += "\n\nLembre-se de resolver pelo menos 1 questão por dia! 🚀"
+
     return msg
 
 async def check_and_send_reminders(context: ContextTypes.DEFAULT_TYPE):
@@ -490,14 +492,10 @@ async def check_and_send_reminders(context: ContextTypes.DEFAULT_TYPE):
             
             # Formata a mensagem (SEM Markdown para evitar erros)
             message = (
-                f"🔔 Hora de treinar, {user_data.handle}! 🧠\n\n"
+                f"🔥 Bora treinar, {user_data.handle}! 💪\n\n"
+                f"{motivational_msg}\n\n"
                 f"{format_daily_stats(total_accepted, days_with_submission, user_data.handle)}\n\n"
-                f"🎯 Meta: 1 questão por dia\n"
                 f"\n---\n"
-                f"⚙️ Para ajustar seus lembretes, use os comandos:\n"
-                f"/list_reminders - Ver seus lembretes\n"
-                f"/set_reminder - Definir novo lembrete\n"
-                f"/remove_reminder - Remover lembrete"
             )
             
             # Envia a mensagem
