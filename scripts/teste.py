@@ -45,7 +45,7 @@ def test_local():
             print(f"     {i}. Dias: {', '.join(r['days'])} - Horário: {r['time']}")
     
     # 3. Verifica o horário atual
-    now = datetime.datetime.now()
+    now = datetime.datetime.now(datetime.timezone.utc)
     print(f"\n⏰ Horário atual: {now.strftime('%H:%M')}")
     print(f"   Dia da semana: {now.strftime('%A')}")
     

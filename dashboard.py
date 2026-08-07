@@ -37,7 +37,7 @@ def trigger_workflow(workflow_file: str):
     token = st.secrets.get("GITHUB_TOKEN")
 
     if not token:
-        return None
+        return False, "GITHUB_TOKEN não encontrado em st.secrets"
 
     r = requests.post(
         f"https://api.github.com/repos/anacarlaaf/CodeforcesDashboard/actions/workflows/{workflow_file}/dispatches",
@@ -47,7 +47,11 @@ def trigger_workflow(workflow_file: str):
         },
         json={"ref": "main"},
     )
-    return r.status_code == 204
+
+    if r.status_code == 204:
+        return True, "ok"
+
+    return False, f"HTTP {r.status_code} — {r.text}"
 
 # =============================
 # SIDEBAR
@@ -136,8 +140,8 @@ if st.sidebar.button("🔄 Atualizar dados"):
     st.cache_data.clear()
     st.cache_resource.clear()
 
-    ok_cses = trigger_workflow("update_cses.yml")
-    ok_cf = trigger_workflow("update_cf.yml")
+    ok_cses, msg_cses = trigger_workflow("update_cses.yml")
+    ok_cf, msg_cf = trigger_workflow("update_cf.yml")
 
     if ok_cses and ok_cf:
         st.sidebar.success(
@@ -145,15 +149,17 @@ if st.sidebar.button("🔄 Atualizar dados"):
         )
     elif ok_cses or ok_cf:
         st.sidebar.warning(
-            "Apenas uma das atualizações foi iniciada. "
-            "Verifique se o workflow 'update_cf.yml' existe no repositório."
+            "Apenas uma das atualizações foi iniciada.\n\n"
+            f"CSES: {msg_cses}\n\nCF: {msg_cf}"
         )
     else:
         st.sidebar.error(
-            "Não foi possível iniciar a atualização. Verifique o GITHUB_TOKEN."
+            f"Falha ao iniciar atualização.\n\nCSES: {msg_cses}\n\nCF: {msg_cf}"
         )
 
-    st.rerun()
+    # DEBUG TEMPORÁRIO: comentar st.rerun() por enquanto pra conseguir
+    # ler a mensagem de erro acima sem ela sumir na hora.
+    # st.rerun()
         
 # =============================
 # CARREGAR DADOS

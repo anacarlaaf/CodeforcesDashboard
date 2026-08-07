@@ -59,7 +59,6 @@ COMMANDS = {
     "list_reminders": "Listar seus lembretes atuais",
     "remove_reminder": "Remover um lembrete",
     "remove_all": "Remover todos os lembretes",
-    "stats": "Ver seu progresso (questões e dias de treino)",
     "help": "Mostrar esta mensagem"
 }
 
@@ -385,46 +384,6 @@ async def remove_all(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=reply_markup
     )
 
-async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Mostra as estatísticas do usuário (apenas privado)"""
-    if not private_chat_filter(update):
-        return
-    
-    user_id = str(update.effective_user.id)
-    user_data = reminder_manager.get_user(user_id)
-    
-    if not user_data or not user_data.handle:
-        await update.message.reply_text(
-            "👋 Antes de ver suas estatísticas, preciso saber seu handle do Codeforces!\n\n"
-            "Use /set_handle seu_handle para começar."
-        )
-        return
-    
-    # Últimos 24h
-    total_24h, days_24h = reminder_manager.get_user_stats(user_data.handle, days=1)
-    
-    # Últimos 7 dias
-    total_7d, days_7d = reminder_manager.get_user_stats(user_data.handle, days=7)
-    
-    # Últimos 30 dias
-    total_30d, days_30d = reminder_manager.get_user_stats(user_data.handle, days=30)
-    
-    message = (
-        f"📊 Estatísticas de {user_data.handle}\n\n"
-        f"📅 Últimas 24h:\n"
-        f"• Questões resolvidas: {total_24h}\n"
-        f"• Dias com submissão: {days_24h}\n\n"
-        f"📅 Últimos 7 dias:\n"
-        f"• Questões resolvidas: {total_7d}\n"
-        f"• Dias com submissão: {days_7d}\n\n"
-        f"📅 Últimos 30 dias:\n"
-        f"• Questões resolvidas: {total_30d}\n"
-        f"• Dias com submissão: {days_30d}\n\n"
-        f"🎯 Meta: 1 questão por dia!"
-    )
-    
-    await update.message.reply_text(message)
-
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Mostra a ajuda (apenas privado)"""
     if not private_chat_filter(update):
@@ -490,7 +449,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "Não entendi sua mensagem, mas estou aqui para ajudar!\n\n"
         "Use /help para ver todos os comandos disponíveis ou me envie:\n"
         "• /set_reminder para configurar lembretes\n"
-        "• /stats para ver seu progresso\n"
         "• /list_reminders para ver seus lembretes"
     )
 
@@ -519,7 +477,7 @@ async def check_and_send_reminders(context: ContextTypes.DEFAULT_TYPE):
     """Verifica periodicamente se há lembretes para enviar"""
     logger.info("🔍 Verificando lembretes...")
     
-    now = datetime.datetime.now()
+    now = datetime.datetime.now(datetime.timezone.utc)
     reminders = reminder_manager.get_reminders_for_time(now)
     
     app = context.application
@@ -538,8 +496,7 @@ async def check_and_send_reminders(context: ContextTypes.DEFAULT_TYPE):
                 f"⚙️ Para ajustar seus lembretes, use os comandos:\n"
                 f"/list_reminders - Ver seus lembretes\n"
                 f"/set_reminder - Definir novo lembrete\n"
-                f"/remove_reminder - Remover lembrete\n"
-                f"/stats - Ver estatísticas completas"
+                f"/remove_reminder - Remover lembrete"
             )
             
             # Envia a mensagem
@@ -568,7 +525,6 @@ def main():
     application.add_handler(CommandHandler("list_reminders", list_reminders))
     application.add_handler(CommandHandler("remove_reminder", remove_reminder))
     application.add_handler(CommandHandler("remove_all", remove_all))
-    application.add_handler(CommandHandler("stats", stats))
     
     # Callbacks
     application.add_handler(CallbackQueryHandler(handle_callback))

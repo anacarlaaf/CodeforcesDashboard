@@ -1,0 +1,40 @@
+name: Atualizar dados Codeforces
+
+on:
+  schedule:
+    - cron: '0 6 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: data-update
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Instalar dependências
+        run: |
+          pip install pandas requests streamlit pyarrow
+
+      - name: Rodar atualização Codeforces
+        env:
+          CODEFORCES_USERS: ${{ secrets.CODEFORCES_USERS }}
+        run: python scripts/run_cf_update.py
+
+      - name: Commit e push dos parquets atualizados
+        run: |
+          git config user.email "actions@github.com"
+          git config user.name "GitHub Actions"
+          git add data/cf_submissions.parquet data/cf_rating.parquet data/cf_users.parquet
+          git diff --cached --quiet || git commit -m "chore: update cf parquets [skip ci]"
+          git push
+
