@@ -477,7 +477,7 @@ async def check_and_send_reminders(context: ContextTypes.DEFAULT_TYPE):
     """Verifica periodicamente se há lembretes para enviar"""
     logger.info("🔍 Verificando lembretes...")
     
-    now = datetime.datetime.now()
+    now = datetime.datetime.now(datetime.timezone.utc)
     reminders = reminder_manager.get_reminders_for_time(now)
     
     app = context.application

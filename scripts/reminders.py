@@ -116,29 +116,40 @@ class ReminderManager:
         
         return False
     
-    def get_reminders_for_time(self, current_time: datetime.datetime) -> List[Tuple[str, UserData]]:
+    def get_reminders_for_time(self, current_time_utc: datetime.datetime) -> List[Tuple[str, UserData]]:
         """
-        Retorna os usuários que devem receber lembrete agora
+        Retorna os usuários que devem receber lembrete agora.
+
+        `current_time_utc` deve ser um datetime *timezone-aware* em UTC
+        (ex: datetime.datetime.now(datetime.timezone.utc)). A comparação
+        de dia/horário é feita no fuso horário de CADA usuário, não no
+        fuso do servidor onde o processo está rodando — isso evita que
+        o lembrete dispare na hora errada quando o servidor não está em
+        America/Manaus (ex: VMs que usam UTC por padrão).
         """
-        weekday = current_time.strftime("%A").lower()
-        time_str = current_time.strftime("%H:%M")
-        
+
         result = []
-        
+
         for user_id, data in self.data.items():
             if "reminders" not in data:
                 continue
-            
+
             # Verifica se o usuário tem handle
             handle = data.get("handle")
             if not handle:
                 continue
-            
+
+            # Converte o horário atual (UTC) para o fuso do usuário
+            tz = pytz.timezone(data.get("timezone", DEFAULT_TIMEZONE))
+            local_now = current_time_utc.astimezone(tz)
+
+            weekday = local_now.strftime("%A").lower()
+            time_str = local_now.strftime("%H:%M")
+
             for reminder in data["reminders"]:
                 if weekday in reminder["days"] and reminder["time"] == time_str:
-                    # Verifica se já foi enviado hoje
-                    tz = pytz.timezone(data.get("timezone", DEFAULT_TIMEZONE))
-                    today = current_time.astimezone(tz).date()
+                    # Verifica se já foi enviado hoje (no fuso do usuário)
+                    today = local_now.date()
                     last_sent_key = f"last_sent_{reminder['days']}_{reminder['time']}"
                     
                     if last_sent_key not in data:
