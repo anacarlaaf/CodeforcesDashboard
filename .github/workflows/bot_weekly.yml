@@ -24,6 +24,6 @@ jobs:
         env:
           CODEFORCES_USERS: ${{ secrets.CODEFORCES_USERS }}
           CSES_ACCOUNTS: ${{ secrets.CSES_ACCOUNTS }}
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_BOT_ID: ${{ secrets.TELEGRAM_BOT_ID }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: python scripts/send_rankings.py --period semanal
