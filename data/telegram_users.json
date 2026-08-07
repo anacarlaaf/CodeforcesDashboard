@@ -49,10 +49,35 @@
           "sunday"
         ],
         "time": "22:20"
+      },
+      {
+        "days": [
+          "monday",
+          "tuesday",
+          "wednesday",
+          "thursday",
+          "friday",
+          "saturday",
+          "sunday"
+        ],
+        "time": "22:31"
+      },
+      {
+        "days": [
+          "monday",
+          "tuesday",
+          "wednesday",
+          "thursday",
+          "friday",
+          "saturday",
+          "sunday"
+        ],
+        "time": "22:32"
       }
     ],
     "last_sent_['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']_22:15": "2026-08-06",
-    "last_sent_['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']_22:20": "2026-08-06"
+    "last_sent_['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']_22:20": "2026-08-06",
+    "last_sent_['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']_22:31": "2026-08-06"
   },
   "6900800541": {
     "handle": "mariaflachdacosta",
