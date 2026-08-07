@@ -1,11 +1,13 @@
 import sys
 from pathlib import Path
 
-sys.path.append(str(Path(__file__).resolve().parent.parent))
+project_root = Path(__file__).resolve().parent.parent
+sys.path.append(str(project_root))
 
 import argparse
 import datetime
 import os
+import subprocess
 
 import pandas as pd
 import requests
@@ -13,6 +15,31 @@ import requests
 import codeforces
 import cses
 import rankings
+
+
+def sync_data():
+    """
+    Faz git pull no repositório para garantir que os .parquet locais
+    estão atualizados com o que foi gerado pelos GitHub Actions
+    (update_cf.yml / update_cses.yml) antes de montar o relatório.
+    """
+
+    print("[Sync] Atualizando dados (git pull)...")
+
+    result = subprocess.run(
+        ["git", "pull", "origin", "main"],
+        cwd=project_root,
+        capture_output=True,
+        text=True,
+    )
+
+    if result.returncode != 0:
+        print(
+            f"[Sync] git pull falhou (seguindo com dados locais atuais): "
+            f"{result.stderr.strip()}"
+        )
+    else:
+        print(f"[Sync] {result.stdout.strip()}")
 
 def build_dataset(start: datetime.datetime, end: datetime.datetime):
     """
@@ -172,6 +199,8 @@ def main():
         required=True,
     )
     args = parser.parse_args()
+
+    sync_data()
 
     today = datetime.datetime.now(datetime.timezone.utc)
     end = today.replace(hour=23, minute=59, second=59, microsecond=999999)
