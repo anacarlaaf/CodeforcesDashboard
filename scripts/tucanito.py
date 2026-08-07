@@ -496,8 +496,7 @@ async def check_and_send_reminders(context: ContextTypes.DEFAULT_TYPE):
             message = (
                 f"🔥 Bora treinar, {user_data.handle}! 💪\n\n"
                 f"{motivational_msg}\n\n"
-                f"{format_daily_stats(total_accepted, days_with_submission, user_data.handle)}\n\n"
-                f"\n---\n"
+                #f"{format_daily_stats(total_accepted, days_with_submission, user_data.handle)}\n\n"
             )
             
             # Envia a mensagem
