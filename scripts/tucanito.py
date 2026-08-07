@@ -489,7 +489,9 @@ async def check_and_send_reminders(context: ContextTypes.DEFAULT_TYPE):
         try:
             # Busca as estatísticas do usuário
             total_accepted, days_with_submission = reminder_manager.get_user_stats(user_data.handle, days=1)
-            
+
+            motivational_msg = random.choice(MOTIVATIONAL_MESSAGES)
+
             # Formata a mensagem (SEM Markdown para evitar erros)
             message = (
                 f"🔥 Bora treinar, {user_data.handle}! 💪\n\n"
