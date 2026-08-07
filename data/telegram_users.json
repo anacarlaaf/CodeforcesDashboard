@@ -1,5 +1,117 @@
 {
   "5945899064": {
-    "handle": "anacarlaaf"
+    "handle": "anacarlaaf",
+    "reminders": [
+      {
+        "days": [
+          "thursday"
+        ],
+        "time": "21:48"
+      },
+      {
+        "days": [
+          "thursday"
+        ],
+        "time": "21:52"
+      },
+      {
+        "days": [
+          "monday",
+          "tuesday",
+          "wednesday",
+          "thursday",
+          "friday",
+          "saturday",
+          "sunday"
+        ],
+        "time": "22:00"
+      },
+      {
+        "days": [
+          "monday",
+          "tuesday",
+          "wednesday",
+          "thursday",
+          "friday",
+          "saturday",
+          "sunday"
+        ],
+        "time": "22:15"
+      },
+      {
+        "days": [
+          "monday",
+          "tuesday",
+          "wednesday",
+          "thursday",
+          "friday",
+          "saturday",
+          "sunday"
+        ],
+        "time": "22:20"
+      }
+    ],
+    "last_sent_['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']_22:15": "2026-08-06",
+    "last_sent_['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']_22:20": "2026-08-06"
+  },
+  "6900800541": {
+    "handle": "mariaflachdacosta",
+    "reminders": [
+      {
+        "days": [
+          "monday"
+        ],
+        "time": "16:00"
+      },
+      {
+        "days": [
+          "wednesday"
+        ],
+        "time": "16:00"
+      },
+      {
+        "days": [
+          "friday"
+        ],
+        "time": "14:00"
+      },
+      {
+        "days": [
+          "tuesday"
+        ],
+        "time": "09:00"
+      },
+      {
+        "days": [
+          "thursday"
+        ],
+        "time": "09:00"
+      }
+    ],
+    "last_sent_['thursday']_09:00": "2026-08-06"
+  },
+  "1743020723": {
+    "handle": "lip33"
+  },
+  "974122280": {
+    "handle": "rebecamadi",
+    "reminders": [
+      {
+        "days": [
+          "monday",
+          "tuesday",
+          "wednesday",
+          "thursday",
+          "friday",
+          "saturday",
+          "sunday"
+        ],
+        "time": "15:00"
+      }
+    ],
+    "last_sent_['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']_15:00": "2026-08-06"
+  },
+  "5684039236": {
+    "handle": "luanzito"
   }
 }
