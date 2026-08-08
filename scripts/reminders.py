@@ -176,44 +176,71 @@ class ReminderManager:
     
     def get_user_stats(self, handle: str, days: int = 1) -> Tuple[int, int]:
         """
-        Retorna (total_questoes, dias_com_submissao) para um handle
+        Retorna (total_questoes_unicas, dias_com_submissao) para um handle.
+
+        Usa a MESMA lógica de contagem do dashboard/ranking:
+        - combina Codeforces + CSES (antes só olhava Codeforces)
+        - conta problemas ÚNICOS resolvidos via drop_duplicates
+          (antes contava toda submissão com verdict OK, então reenvios
+          aceitos do mesmo problema eram contados várias vezes)
         """
         try:
-            # Carrega os dados do Codeforces
-            subs, rating, users = codeforces.load_data(handles=[handle])
-            
-            # Se não tem dados, retorna 0
-            if subs is None or subs.empty:
-                return 0, 0
-            
-            # Verifica se tem a coluna 'date'
-            if 'date' not in subs.columns:
-                # Tenta criar a coluna 'date' a partir de 'creationTimeSeconds'
-                if 'creationTimeSeconds' in subs.columns:
-                    subs['date'] = pd.to_datetime(subs['creationTimeSeconds'], unit='s', utc=True)
-                else:
-                    return 0, 0
-            
-            # Filtra por data (últimos `days` dias)
             now = datetime.datetime.now(datetime.timezone.utc)
             cutoff = now - datetime.timedelta(days=days)
-            
+
+            # --- Codeforces ---
+            subs, _, _ = codeforces.load_data(handles=[handle])
+
+            if subs is None or subs.empty:
+                subs = pd.DataFrame(
+                    columns=["handle", "date", "verdict", "problem.contestId", "problem.index"]
+                )
+            else:
+                subs = subs.copy()
+                if 'date' not in subs.columns:
+                    if 'creationTimeSeconds' in subs.columns:
+                        subs['date'] = pd.to_datetime(subs['creationTimeSeconds'], unit='s', utc=True)
+                    else:
+                        subs['date'] = pd.NaT
+
+            # --- CSES ---
+            try:
+                cses_subs = cses.load_submissions()
+            except Exception:
+                cses_subs = pd.DataFrame()
+
+            if cses_subs is not None and not cses_subs.empty:
+                cses_subs = cses_subs[cses_subs['handle'] == handle].copy()
+            else:
+                cses_subs = pd.DataFrame(
+                    columns=["handle", "date", "verdict", "problem.contestId", "problem.index"]
+                )
+
+            all_subs = pd.concat([subs, cses_subs], ignore_index=True, sort=False)
+
+            if all_subs.empty:
+                return 0, 0
+
             # Garante que 'date' é datetime
-            subs['date'] = pd.to_datetime(subs['date'], utc=True)
-            
-            subs_filtered = subs[subs['date'] >= cutoff]
-            
+            all_subs['date'] = pd.to_datetime(all_subs['date'], utc=True)
+
+            subs_filtered = all_subs[all_subs['date'] >= cutoff]
+
             if subs_filtered.empty:
                 return 0, 0
-            
-            # Total de submissões aceitas
-            total_accepted = len(subs_filtered[subs_filtered['verdict'] == 'OK'])
-            
-            # Dias com submissão (qualquer submissão)
+
+            # Problemas únicos resolvidos (evita contar reenvios/re-submissões)
+            solved = subs_filtered[subs_filtered['verdict'] == 'OK']
+            unique_solved = solved.drop_duplicates(
+                ['handle', 'problem.contestId', 'problem.index']
+            )
+            total_solved = len(unique_solved)
+
+            # Dias com submissão (qualquer submissão, aceita ou não)
             days_with_submission = subs_filtered['date'].dt.date.nunique()
-            
-            return total_accepted, days_with_submission
-            
+
+            return total_solved, days_with_submission
+
         except Exception as e:
             print(f"Erro ao buscar estatísticas para {handle}: {e}")
             return 0, 0
