@@ -100,15 +100,15 @@ preset = st.sidebar.radio(
 today = datetime.datetime.now(datetime.timezone.utc)
 
 if preset == "Última semana":
-    start = today - datetime.timedelta(days=7)
+    start = (today - datetime.timedelta(days=6)).replace(hour=0, minute=0, second=0, microsecond=0)
     end = today.replace(hour=23, minute=59, second=59, microsecond=999999)
 
 elif preset == "Último mês":
-    start = today - datetime.timedelta(days=30)
+    start = (today - datetime.timedelta(days=29)).replace(hour=0, minute=0, second=0, microsecond=0)
     end = today.replace(hour=23, minute=59, second=59, microsecond=999999)
 
 elif preset == "Últimos 3 meses":
-    start = today - datetime.timedelta(days=90)
+    start = (today - datetime.timedelta(days=89)).replace(hour=0, minute=0, second=0, microsecond=0)
     end = today.replace(hour=23, minute=59, second=59, microsecond=999999)
 
 else:
@@ -140,21 +140,20 @@ if st.sidebar.button("🔄 Atualizar dados"):
     st.cache_data.clear()
     st.cache_resource.clear()
 
+    # Codeforces não tem mais persistência em parquet: os dados são
+    # sempre buscados ao vivo na API (com cache em memória de 5min).
+    # Limpar o cache acima já força a próxima consulta a buscar de novo.
     ok_cses, msg_cses = trigger_workflow("update_cses.yml")
-    ok_cf, msg_cf = trigger_workflow("update_cf.yml")
 
-    if ok_cses and ok_cf:
+    if ok_cses:
         st.sidebar.success(
-            "Atualização iniciada (CSES + Codeforces)."
-        )
-    elif ok_cses or ok_cf:
-        st.sidebar.warning(
-            "Apenas uma das atualizações foi iniciada.\n\n"
-            f"CSES: {msg_cses}\n\nCF: {msg_cf}"
+            "Cache limpo — Codeforces será buscado ao vivo na próxima consulta. "
+            "Atualização do CSES iniciada."
         )
     else:
-        st.sidebar.error(
-            f"Falha ao iniciar atualização.\n\nCSES: {msg_cses}\n\nCF: {msg_cf}"
+        st.sidebar.warning(
+            "Cache limpo — Codeforces será buscado ao vivo na próxima consulta.\n\n"
+            f"Falha ao iniciar atualização do CSES: {msg_cses}"
         )
 
     # DEBUG TEMPORÁRIO: comentar st.rerun() por enquanto pra conseguir
@@ -295,7 +294,7 @@ if mode == "Todos":
     render_ranking(
         rk_col4,
         "Maior frequência",
-        rankings.top_frequency(subs),
+        rankings.top_frequency(subs, unique_solved),
         "dias",
         "dias",
     )

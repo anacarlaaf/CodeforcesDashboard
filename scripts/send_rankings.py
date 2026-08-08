@@ -7,6 +7,7 @@ sys.path.append(str(project_root))
 import argparse
 import datetime
 import os
+import subprocess
 
 import pandas as pd
 import requests
@@ -14,26 +15,42 @@ import requests
 import codeforces
 import cses
 import rankings
-from bot_config import BOT_TOKEN
 
-# Caminhos absolutos: como este script agora roda direto na VM (via
-# cron), não podemos depender do diretório de onde ele foi chamado.
-DATA_DIR = project_root / "data"
 
+def sync_data():
+    """
+    Faz git pull no repositório para garantir que o cses_all.parquet
+    local está atualizado com o que foi gerado pelo GitHub Action
+    (update_cses.yml) antes de montar o relatório.
+
+    Codeforces não depende mais disso: os dados são buscados ao vivo
+    na API dentro de `codeforces.load_data()`, sem parquet.
+    """
+
+    print("[Sync] Atualizando dados (git pull)...")
+
+    result = subprocess.run(
+        ["git", "pull", "origin", "main"],
+        cwd=project_root,
+        capture_output=True,
+        text=True,
+    )
+
+    if result.returncode != 0:
+        print(
+            f"[Sync] git pull falhou (seguindo com dados locais atuais): "
+            f"{result.stderr.strip()}"
+        )
+    else:
+        print(f"[Sync] {result.stdout.strip()}")
 
 def build_dataset(start: datetime.datetime, end: datetime.datetime):
     """
     Reproduz a mesma lógica de carregamento/filtro do dashboard.py,
-    lendo direto dos parquets locais (sem Streamlit/UI).
-
-    Importante: este script roda na mesma VM que atualiza os dados
-    (via run_cf_update.py / run_cses_update.py), então ele sempre lê
-    os arquivos mais recentes — sem precisar de git pull e sem risco
-    de divergir do que o dashboard/bot mostram (esse era o motivo dos
-    números baterem errado quando isso rodava pelo GitHub Actions).
+    mas lendo direto dos parquets (sem Streamlit/UI).
     """
 
-    users = pd.read_csv(DATA_DIR / "users.csv")
+    users = pd.read_csv("data/users.csv")
 
     handles = (
         users["codeforces"]
@@ -43,12 +60,7 @@ def build_dataset(start: datetime.datetime, end: datetime.datetime):
     )
     handles = handles[handles != ""].tolist()
 
-    subs, rating, cf_users = codeforces.load_data(
-        handles=handles,
-        subs_parquet=str(DATA_DIR / "cf_submissions.parquet"),
-        rating_parquet=str(DATA_DIR / "cf_rating.parquet"),
-        users_parquet=str(DATA_DIR / "cf_users.parquet"),
-    )
+    subs, rating, cf_users = codeforces.load_data(handles=handles)
 
     subs["date"] = pd.to_datetime(
         subs["creationTimeSeconds"],
@@ -56,11 +68,7 @@ def build_dataset(start: datetime.datetime, end: datetime.datetime):
         utc=True,
     )
 
-    cses_subs = cses.load_submissions(
-        cses_all_csv=str(DATA_DIR / "cses_all.parquet"),
-        users_csv=str(DATA_DIR / "users.csv"),
-        problems_csv=str(DATA_DIR / "cses_problems.csv"),
-    )
+    cses_subs = cses.load_submissions()
     cses_subs = cses_subs[cses_subs["handle"].isin(handles)]
     cses_subs["problem.rating"] = -1
 
@@ -147,7 +155,7 @@ def build_message(period_label: str, start: datetime.datetime, end: datetime.dat
         "",
         format_top(
             "Maior frequência",
-            rankings.top_frequency(subs),
+            rankings.top_frequency(subs, unique_solved),
             "dias", "dias com submissão",
         ),
     ]
@@ -156,23 +164,16 @@ def build_message(period_label: str, start: datetime.datetime, end: datetime.dat
 
 
 def send_telegram_message(text: str):
-    """
-    Usa o mesmo BOT_TOKEN de bot_config.py — o mesmo token que o
-    tucanito.py já usa com sucesso para os lembretes individuais.
-    Antes esse script montava a URL com TELEGRAM_BOT_ID lido direto do
-    ambiente do GitHub Actions, que estava diferente/desatualizado em
-    relação ao valor real da VM. O Telegram responde 404 quando o
-    token não corresponde a nenhum bot, o que bate com o erro visto.
-    """
 
+    token = os.environ.get("TELEGRAM_BOT_ID")
     chat_id = os.environ.get("TELEGRAM_CHAT_ID")
 
-    if not chat_id:
+    if not token or not chat_id:
         raise RuntimeError(
-            "TELEGRAM_CHAT_ID não encontrado no ambiente."
+            "TELEGRAM_BOT_TOKEN e/ou TELEGRAM_CHAT_ID não encontrados no ambiente."
         )
 
-    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+    url = f"https://api.telegram.org/bot{token}/sendMessage"
 
     r = requests.post(
         url,
@@ -202,14 +203,16 @@ def main():
     )
     args = parser.parse_args()
 
+    sync_data()
+
     today = datetime.datetime.now(datetime.timezone.utc)
     end = today.replace(hour=23, minute=59, second=59, microsecond=999999)
 
     if args.period == "semanal":
-        start = today - datetime.timedelta(days=7)
+        start = (today - datetime.timedelta(days=6)).replace(hour=0, minute=0, second=0, microsecond=0)
         period_label = "Semanal"
     else:
-        start = today - datetime.timedelta(days=30)
+        start = (today - datetime.timedelta(days=29)).replace(hour=0, minute=0, second=0, microsecond=0)
         period_label = "Mensal"
 
     message = build_message(period_label, start, end)
@@ -220,4 +223,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()git 
+    main()
