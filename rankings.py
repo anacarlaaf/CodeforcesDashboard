@@ -63,16 +63,21 @@ def top_cses_solved(unique_solved: pd.DataFrame, n: int = 3) -> pd.DataFrame:
     return counts.head(n).reset_index()
 
 
-def top_frequency(subs: pd.DataFrame, unique_solved: pd.DataFrame, n: int = 3) -> pd.DataFrame:
+def top_frequency(
+    subs: pd.DataFrame,
+    unique_solved: pd.DataFrame,
+    n: int = 3
+) -> pd.DataFrame:
     """
     Handles com mais dias distintos em que houve pelo menos uma
     submissão ACEITA (verdict == "OK"), seja no Codeforces ou no CSES,
     no período filtrado.
 
     Em caso de empate na quantidade de dias, desempata pela quantidade
-    total de questões resolvidas no mesmo período (`unique_solved`,
-    já deduplicado por handle+problema como usado em `top_total_solved`).
+    total de questões resolvidas no mesmo período.
     """
+
+    n = int(n)
 
     if subs.empty:
         return pd.DataFrame(columns=["handle", "dias"])
@@ -84,35 +89,43 @@ def top_frequency(subs: pd.DataFrame, unique_solved: pd.DataFrame, n: int = 3) -
 
     tmp["day"] = tmp["date"].dt.date
 
+    # Dias distintos com pelo menos uma submissão OK
     dias = (
-        tmp
-        .groupby("handle")["day"]
+        tmp.groupby("handle")["day"]
         .nunique()
-        .rename("dias")
+        .reset_index(name="dias")
     )
 
-    # total de questões resolvidas no período, por handle (critério de desempate)
+    # Questões resolvidas no período, para desempate
     if unique_solved is None or unique_solved.empty:
-        questoes = pd.Series(0, index=dias.index, name="questões")
+        questoes = pd.DataFrame({
+            "handle": dias["handle"],
+            "questões": 0
+        })
     else:
         questoes = (
-            unique_solved
-            .groupby("handle")
+            unique_solved.groupby("handle")
             .size()
-            .rename("questões")
+            .reset_index(name="questões")
         )
 
-    result = (
-        pd.concat([dias, questoes], axis=1)
-        .fillna(0)
+    # Merge explícito pelo handle
+    result = dias.merge(
+        questoes,
+        on="handle",
+        how="left"
     )
 
-    result["dias"] = result["dias"].astype(int)
-    result["questões"] = result["questões"].astype(int)
+    result["dias"] = result["dias"].fillna(0).astype(int)
+    result["questões"] = result["questões"].fillna(0).astype(int)
 
+    # Primeiro: mais dias
+    # Segundo: mais questões resolvidas
     result = result.sort_values(
         ["dias", "questões"],
-        ascending=[False, False],
+        ascending=[False, False]
     )
 
-    return result.head(n).reset_index()
+    return result.head(n)[
+        ["handle", "dias"]
+    ].reset_index(drop=True)
