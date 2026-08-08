@@ -218,6 +218,10 @@ def build_dataset(start: datetime.datetime, end: datetime.datetime):
 
 
 def format_top(title: str, df: pd.DataFrame, value_col: str, suffix: str) -> str:
+    """
+    Formata o top 3 sem usar bloco de código.
+    Usa Markdown para negrito.
+    """
     medals = ["🥇", "🥈", "🥉"]
 
     lines = [f"*{title}*"]
@@ -228,26 +232,13 @@ def format_top(title: str, df: pd.DataFrame, value_col: str, suffix: str) -> str
 
     top = df.reset_index(drop=True).head(3)
 
-    # largura máxima dos nomes para alinhar os números
-    max_name_len = max(
-        len(str(row["handle"]))
-        for _, row in top.iterrows()
-    )
-
-    lines.append("```")
-
     for i, row in top.iterrows():
         medal = medals[i]
-
-        handle = str(row["handle"]).ljust(max_name_len)
-
+        handle = str(row["handle"])
         value = str(row[value_col])
-
-        lines.append(
-            f"{medal} {handle}  {value} {suffix}"
-        )
-
-    lines.append("```")
+        
+        # Formatação sem bloco de código, usando negrito
+        lines.append(f"{medal} *{handle}* — {value} {suffix}")
 
     return "\n".join(lines)
 
@@ -305,7 +296,7 @@ def send_telegram_message(text: str):
         json={
             "chat_id": chat_id,
             "text": text,
-            "parse_mode": "Markdown",
+            "parse_mode": "Markdown",  # Mantém Markdown para negrito/itálico
         },
         timeout=20,
     )
