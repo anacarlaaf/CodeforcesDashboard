@@ -10,6 +10,8 @@ import datetime
 import time
 import random
 import logging
+import asyncio
+import subprocess
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes, CallbackQueryHandler
 import pytz
@@ -27,6 +29,9 @@ logger = logging.getLogger(__name__)
 
 # Inicializa o gerenciador de lembretes
 reminder_manager = ReminderManager()
+
+# Evita rodar a atualização de dados mais de uma vez no mesmo minuto
+_last_update_run_key = None
 
 # Mapeamento completo de dias (com e sem acento, completo e abreviado)
 DAYS_MAP = {
@@ -476,6 +481,65 @@ def format_daily_stats(total_accepted: int, days_with_submission: int, handle: s
 
     return msg
 
+async def run_data_update():
+    """
+    Executa o script de atualização de dados do CSES em uma thread
+    separada, para não bloquear o loop de eventos do bot enquanto o
+    scraping acontece.
+
+    O Codeforces NÃO precisa de atualização separada: codeforces.py
+    sempre busca os dados ao vivo na API (sem parquet), com um cache em
+    memória de 5min via @st.cache_data — que já expira sozinho antes do
+    lembrete ser enviado, então a mensagem sempre reflete dados recentes.
+    """
+    loop = asyncio.get_running_loop()
+
+    def _run():
+        script = project_root / "scripts" / "run_cses_update.py"
+        if not script.exists():
+            logger.warning(f"⚠️ Script de atualização não encontrado: {script}")
+            return
+        try:
+            result = subprocess.run(
+                [sys.executable, str(script)],
+                cwd=project_root,
+                capture_output=True,
+                text=True,
+                timeout=300,
+            )
+            if result.returncode != 0:
+                logger.error(f"❌ Erro ao rodar {script.name}: {result.stderr.strip()}")
+        except Exception as e:
+            logger.error(f"❌ Falha ao executar {script.name}: {e}")
+
+    await loop.run_in_executor(None, _run)
+
+
+async def check_upcoming_reminders(context: ContextTypes.DEFAULT_TYPE):
+    """
+    Roda a cada minuto. Se algum usuário tem um lembrete disparando em
+    ~10 minutos, atualiza os dados de CF/CSES antes, para que o lembrete
+    já saia com as submissões mais recentes.
+    """
+    global _last_update_run_key
+
+    now = datetime.datetime.now(datetime.timezone.utc)
+    upcoming = reminder_manager.get_reminders_upcoming_in(now, minutes_ahead=10)
+
+    if not upcoming:
+        return
+
+    # Dedupe: só roda uma vez por minuto, mesmo com vários usuários/lembretes
+    minute_key = now.strftime("%Y-%m-%d %H:%M")
+    if _last_update_run_key == minute_key:
+        return
+    _last_update_run_key = minute_key
+
+    logger.info(f"🔄 Lembrete chegando em 10min para {len(upcoming)} usuário(s) — atualizando dados do CSES...")
+    await run_data_update()
+    logger.info("✅ Dados do CSES atualizados antes do lembrete.")
+
+
 async def check_and_send_reminders(context: ContextTypes.DEFAULT_TYPE):
     """Verifica periodicamente se há lembretes para enviar"""
     logger.info("🔍 Verificando lembretes...")
@@ -488,7 +552,8 @@ async def check_and_send_reminders(context: ContextTypes.DEFAULT_TYPE):
     for user_id, user_data in reminders:
         try:
             # Busca as estatísticas do usuário
-            total_accepted, days_with_submission = reminder_manager.get_user_stats(user_data.handle, days=1)
+            total_accepted, days_with_submission = reminder_manager.get_user_stats(user_data.handle, user_data.timezone)
+            solved_yesterday = reminder_manager.get_user_solved_yesterday(user_data.handle, user_data.timezone)
 
             motivational_msg = random.choice(MOTIVATIONAL_MESSAGES)
 
@@ -496,8 +561,15 @@ async def check_and_send_reminders(context: ContextTypes.DEFAULT_TYPE):
             message = (
                 f"🔥 Bora treinar, {user_data.handle}! 💪\n\n"
                 f"{motivational_msg}\n\n"
-                #f"{format_daily_stats(total_accepted, days_with_submission, user_data.handle)}\n\n"
+                f"{format_daily_stats(total_accepted, days_with_submission, user_data.handle)}\n\n"
             )
+
+            # Se o usuário não resolveu nenhuma questão ontem, sugere compensar hoje
+            if solved_yesterday == 0:
+                message += (
+                    "😅 Notei que você não resolveu nenhuma questão ontem...\n"
+                    "Que tal aproveitar hoje pra compensar e resolver umas 2 ou mais? 🚀\n\n"
+                )
             
             # Envia a mensagem
             await app.bot.send_message(
@@ -536,7 +608,16 @@ def main():
     job_queue = application.job_queue
     
     if job_queue:
-        # Verifica a cada minuto
+        # Verifica a cada minuto se há lembretes chegando em 10min, para
+        # atualizar os dados de CF/CSES ANTES do envio
+        job_queue.run_repeating(
+            check_upcoming_reminders,
+            interval=60,  # 60 segundos
+            first=5       # primeira execução em 5 segundos
+        )
+        logger.info("🔄 Job de atualização antecipada de dados configurado")
+
+        # Verifica a cada minuto se algum lembrete deve ser enviado agora
         job_queue.run_repeating(
             check_and_send_reminders,
             interval=60,  # 60 segundos

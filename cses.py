@@ -21,13 +21,23 @@ _raw = os.environ.get("CSES_ACCOUNTS")
 
 if not _raw:
     try:
-        _raw = st.secrets.get("CSES_ACCOUNTS")
-    except Exception:
-        pass
+        _raw = st.secrets["CSES_ACCOUNTS"]
+    except Exception as e:
+        print("Erro ao carregar CSES_ACCOUNTS:", e)
 
 if not _raw:
-    raise RuntimeError("CSES_ACCOUNTS não encontrado.")
+    raise RuntimeError(
+        "CSES_ACCOUNTS não encontrado. "
+        "Verifique a variável de ambiente ou .streamlit/secrets.toml."
+    )
 
+try:
+    accounts = json.loads(_raw)
+except json.JSONDecodeError as e:
+    raise RuntimeError(
+        f"CSES_ACCOUNTS contém JSON inválido: {e}"
+    )
+    
 accounts = json.loads(_raw)
 
 users = pd.read_csv("data/users.csv")

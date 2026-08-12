@@ -23,15 +23,15 @@ if not BOT_TOKEN:
 if not BOT_TOKEN:
     try:
         import streamlit as st
-        BOT_TOKEN = st.secrets.get("TELEGRAM_BOT_TOKEN")
+        BOT_TOKEN = st.secrets.get("TELEGRAM_BOT_ID")
     except:
         pass
 
 if not BOT_TOKEN:
-    print("❌ TELEGRAM_BOT_TOKEN não encontrado!")
+    print("❌ TELEGRAM_BOT_ID não encontrado!")
     print("   Configure de uma das seguintes formas:")
-    print("   1. Variável de ambiente: export TELEGRAM_BOT_TOKEN='seu_token'")
-    print("   2. Arquivo .env: echo 'TELEGRAM_BOT_TOKEN=seu_token' > .env")
+    print("   1. Variável de ambiente: export TELEGRAM_BOT_ID='seu_token'")
+    print("   2. Arquivo .env: echo 'TELEGRAM_BOT_ID=seu_token' > .env")
     print("   3. Secrets do Streamlit")
     sys.exit(1)
 

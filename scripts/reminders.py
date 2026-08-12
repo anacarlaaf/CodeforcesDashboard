@@ -174,73 +174,147 @@ class ReminderManager:
         
         return result
     
-    def get_user_stats(self, handle: str, days: int = 1) -> Tuple[int, int]:
+    def get_reminders_upcoming_in(self, current_time_utc: datetime.datetime, minutes_ahead: int = 10) -> List[Tuple[str, str]]:
         """
-        Retorna (total_questoes_unicas, dias_com_submissao) para um handle.
+        Retorna [(user_id, horario)] para lembretes que vão disparar daqui a
+        `minutes_ahead` minutos (calculado no fuso de cada usuário).
 
-        Usa a MESMA lógica de contagem do dashboard/ranking:
-        - combina Codeforces + CSES (antes só olhava Codeforces)
-        - conta problemas ÚNICOS resolvidos via drop_duplicates
-          (antes contava toda submissão com verdict OK, então reenvios
-          aceitos do mesmo problema eram contados várias vezes)
+        Usado para saber quando atualizar os dados (CF/CSES) ANTES do envio
+        do lembrete, para que a mensagem já reflita as submissões recentes.
+        """
+        result = []
+        offset = datetime.timedelta(minutes=minutes_ahead)
+
+        for user_id, data in self.data.items():
+            if "reminders" not in data:
+                continue
+
+            handle = data.get("handle")
+            if not handle:
+                continue
+
+            tz = pytz.timezone(data.get("timezone", DEFAULT_TIMEZONE))
+            target_local = (current_time_utc + offset).astimezone(tz)
+
+            weekday = target_local.strftime("%A").lower()
+            time_str = target_local.strftime("%H:%M")
+
+            for reminder in data["reminders"]:
+                if weekday in reminder["days"] and reminder["time"] == time_str:
+                    result.append((user_id, reminder["time"]))
+
+        return result
+
+    def _load_combined_submissions(self, handle: str) -> pd.DataFrame:
+        """Carrega e combina submissões de Codeforces + CSES para um handle."""
+        subs, _, _ = codeforces.load_data(handles=[handle])
+
+        if subs is None or subs.empty:
+            subs = pd.DataFrame(
+                columns=["handle", "date", "verdict", "problem.contestId", "problem.index"]
+            )
+        else:
+            subs = subs.copy()
+            if 'date' not in subs.columns:
+                if 'creationTimeSeconds' in subs.columns:
+                    subs['date'] = pd.to_datetime(subs['creationTimeSeconds'], unit='s', utc=True)
+                else:
+                    subs['date'] = pd.NaT
+
+        try:
+            cses_subs = cses.load_submissions()
+        except Exception:
+            cses_subs = pd.DataFrame()
+
+        if cses_subs is not None and not cses_subs.empty:
+            cses_subs = cses_subs[cses_subs['handle'] == handle].copy()
+        else:
+            cses_subs = pd.DataFrame(
+                columns=["handle", "date", "verdict", "problem.contestId", "problem.index"]
+            )
+
+        all_subs = pd.concat([subs, cses_subs], ignore_index=True, sort=False)
+
+        if all_subs.empty:
+            return all_subs
+
+        all_subs['date'] = pd.to_datetime(all_subs['date'], utc=True)
+        return all_subs
+
+    def _count_solved_and_active_days_in_range(
+        self, handle: str, start_utc: datetime.datetime, end_utc: datetime.datetime
+    ) -> Tuple[int, int]:
+        """
+        Retorna (questoes_unicas_resolvidas, dias_com_submissao) para um
+        handle, considerando apenas submissões no intervalo [start_utc, end_utc].
+        """
+        all_subs = self._load_combined_submissions(handle)
+        if all_subs.empty:
+            return 0, 0
+
+        mask = (all_subs['date'] >= start_utc) & (all_subs['date'] <= end_utc)
+        subs_in_range = all_subs[mask]
+
+        if subs_in_range.empty:
+            return 0, 0
+
+        solved = subs_in_range[subs_in_range['verdict'] == 'OK']
+        unique_solved = solved.drop_duplicates(
+            ['handle', 'problem.contestId', 'problem.index']
+        )
+        total_solved = len(unique_solved)
+        days_with_submission = subs_in_range['date'].dt.date.nunique()
+
+        return total_solved, days_with_submission
+
+    def get_user_solved_yesterday(self, handle: str, timezone: str) -> int:
+        """
+        Retorna quantas questões ÚNICAS o usuário resolveu 'ontem', considerando
+        o dia de calendário no fuso horário do próprio usuário (não UTC).
         """
         try:
-            now = datetime.datetime.now(datetime.timezone.utc)
-            cutoff = now - datetime.timedelta(days=days)
+            tz = pytz.timezone(timezone)
+            now_local = datetime.datetime.now(datetime.timezone.utc).astimezone(tz)
+            yesterday_local_date = now_local.date() - datetime.timedelta(days=1)
 
-            # --- Codeforces ---
-            subs, _, _ = codeforces.load_data(handles=[handle])
+            start_local = tz.localize(datetime.datetime.combine(yesterday_local_date, datetime.time.min))
+            end_local = tz.localize(datetime.datetime.combine(yesterday_local_date, datetime.time.max))
 
-            if subs is None or subs.empty:
-                subs = pd.DataFrame(
-                    columns=["handle", "date", "verdict", "problem.contestId", "problem.index"]
-                )
-            else:
-                subs = subs.copy()
-                if 'date' not in subs.columns:
-                    if 'creationTimeSeconds' in subs.columns:
-                        subs['date'] = pd.to_datetime(subs['creationTimeSeconds'], unit='s', utc=True)
-                    else:
-                        subs['date'] = pd.NaT
+            start_utc = start_local.astimezone(datetime.timezone.utc)
+            end_utc = end_local.astimezone(datetime.timezone.utc)
 
-            # --- CSES ---
-            try:
-                cses_subs = cses.load_submissions()
-            except Exception:
-                cses_subs = pd.DataFrame()
-
-            if cses_subs is not None and not cses_subs.empty:
-                cses_subs = cses_subs[cses_subs['handle'] == handle].copy()
-            else:
-                cses_subs = pd.DataFrame(
-                    columns=["handle", "date", "verdict", "problem.contestId", "problem.index"]
-                )
-
-            all_subs = pd.concat([subs, cses_subs], ignore_index=True, sort=False)
-
-            if all_subs.empty:
-                return 0, 0
-
-            # Garante que 'date' é datetime
-            all_subs['date'] = pd.to_datetime(all_subs['date'], utc=True)
-
-            subs_filtered = all_subs[all_subs['date'] >= cutoff]
-
-            if subs_filtered.empty:
-                return 0, 0
-
-            # Problemas únicos resolvidos (evita contar reenvios/re-submissões)
-            solved = subs_filtered[subs_filtered['verdict'] == 'OK']
-            unique_solved = solved.drop_duplicates(
-                ['handle', 'problem.contestId', 'problem.index']
-            )
-            total_solved = len(unique_solved)
-
-            # Dias com submissão (qualquer submissão, aceita ou não)
-            days_with_submission = subs_filtered['date'].dt.date.nunique()
-
-            return total_solved, days_with_submission
+            total_solved, _ = self._count_solved_and_active_days_in_range(handle, start_utc, end_utc)
+            return total_solved
 
         except Exception as e:
-            print(f"Erro ao buscar estatísticas para {handle}: {e}")
+            print(f"Erro ao buscar questões de ontem para {handle}: {e}")
+            return 0
+
+    def get_user_stats(self, handle: str, timezone: str = DEFAULT_TIMEZONE) -> Tuple[int, int]:
+        """
+        Retorna (total_questoes_unicas, dias_com_submissao) referentes ao dia
+        de HOJE, no fuso horário local do usuário (não uma janela rolante de
+        24h em UTC, que misturava parte de ontem com parte de hoje e dava a
+        sensação de dado "desatualizado"/inconsistente).
+
+        Usa a MESMA lógica de contagem do dashboard/ranking:
+        - combina Codeforces + CSES
+        - conta problemas ÚNICOS resolvidos via drop_duplicates
+          (evita contar reenvios aceitos do mesmo problema várias vezes)
+        """
+        try:
+            tz = pytz.timezone(timezone)
+            now_local = datetime.datetime.now(datetime.timezone.utc).astimezone(tz)
+            today_local_date = now_local.date()
+
+            start_local = tz.localize(datetime.datetime.combine(today_local_date, datetime.time.min))
+            # Usa "agora" como fim do intervalo (não faz sentido olhar pro
+            # futuro do dia de hoje)
+            end_utc = now_local.astimezone(datetime.timezone.utc)
+            start_utc = start_local.astimezone(datetime.timezone.utc)
+
+            return self._count_solved_and_active_days_in_range(handle, start_utc, end_utc)
+
+        except Exception as e:
+            print(f"Erro ao buscar estatísticas de hoje para {handle}: {e}")
             return 0, 0
