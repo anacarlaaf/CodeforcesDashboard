@@ -251,7 +251,7 @@ if mode == "Todos":
 
     medals = ["🥇", "🥈", "🥉"]
 
-    def render_ranking(col, title, df, value_col, suffix=""):
+    def render_ranking_table(col, title, df, value_col):
         with col:
             st.markdown(f"**{title}**")
 
@@ -259,48 +259,60 @@ if mode == "Todos":
                 st.caption("Sem dados no período.")
                 return
 
-            for i, row in df.reset_index(drop=True).iterrows():
-                medal = medals[i] if i < len(medals) else "•"
-                st.markdown(
-                    f"{medal} **{row['handle']}** — {row[value_col]} {suffix}"
-                )
+            df = df.reset_index(drop=True)
+
+            df.insert(
+                0,
+                "#",
+                [
+                    medals[i] if i < len(medals) else str(i + 1)
+                    for i in range(len(df))
+                ],
+            )
+
+            df = df.rename(
+                columns={"handle": "Handle", value_col: value_col.capitalize()}
+            )
+
+            st.dataframe(
+                df,
+                hide_index=True,
+                width="stretch",
+                height=140,  # mostra ~3 linhas, resto acessível via scroll
+            )
 
     rk_col1, rk_col2, rk_col3, rk_col4 = st.columns(4)
 
-    render_ranking(
+    render_ranking_table(
         rk_col1,
         "Mais questões no total",
-        rankings.top_total_solved(unique_solved),
-        "questões",
+        rankings.top_total_solved(unique_solved, n=len(handles)),
         "questões",
     )
 
-    render_ranking(
+    render_ranking_table(
         rk_col2,
         "Mais questões no Codeforces",
-        rankings.top_codeforces_solved(unique_solved),
-        "questões",
+        rankings.top_codeforces_solved(unique_solved, n=len(handles)),
         "questões",
     )
 
-    render_ranking(
+    render_ranking_table(
         rk_col3,
         "Mais questões no CSES",
-        rankings.top_cses_solved(unique_solved),
-        "questões",
+        rankings.top_cses_solved(unique_solved, n=len(handles)),
         "questões",
     )
 
-    render_ranking(
+    render_ranking_table(
         rk_col4,
         "Maior frequência",
-        rankings.top_frequency(subs, unique_solved),
-        "dias",
+        rankings.top_frequency(subs, unique_solved, n=len(handles)),
         "dias",
     )
 
     # Ranking
-    st.subheader("🏆 Ranking por Rating")
+    st.subheader("🏆 Ranking por quantidade de questões")
 
     # Problemas resolvidos por usuário
     solved_count = (
