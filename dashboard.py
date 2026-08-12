@@ -33,6 +33,23 @@ colors_problems = {
     "2400+": "#FF7777",
 }
 
+def progress_bar_active_days(done, total, size=7):
+    """
+    Barra de progresso para 'dias com submissão', com emojis
+    """
+
+    if total == 0:
+        return ""
+
+    ratio = min(done / total, 1)
+
+    filled = int(ratio * size)
+
+    return (
+        "🟢" * filled
+        + "⚪" * (size - filled)
+    )
+
 def trigger_workflow(workflow_file: str):
     token = st.secrets.get("GITHUB_TOKEN")
 
@@ -100,7 +117,7 @@ preset = st.sidebar.radio(
 today = datetime.datetime.now(datetime.timezone.utc)
 
 if preset == "Última semana":
-    start = (today - datetime.timedelta(days=6)).replace(hour=0, minute=0, second=0, microsecond=0)
+    start = (today - datetime.timedelta(days=7)).replace(hour=0, minute=0, second=0, microsecond=0)
     end = today.replace(hour=23, minute=59, second=59, microsecond=999999)
 
 elif preset == "Último mês":
@@ -251,7 +268,7 @@ if mode == "Todos":
 
     medals = ["🥇", "🥈", "🥉"]
 
-    def render_ranking_table(col, title, df, value_col):
+    def render_ranking(col, title, df, value_col, suffix=""):
         with col:
             st.markdown(f"**{title}**")
 
@@ -259,55 +276,43 @@ if mode == "Todos":
                 st.caption("Sem dados no período.")
                 return
 
-            df = df.reset_index(drop=True)
-
-            df.insert(
-                0,
-                "#",
-                [
-                    medals[i] if i < len(medals) else str(i + 1)
-                    for i in range(len(df))
-                ],
-            )
-
-            df = df.rename(
-                columns={"handle": "Handle", value_col: value_col.capitalize()}
-            )
-
-            st.dataframe(
-                df,
-                hide_index=True,
-                width="stretch",
-                height=140,  # mostra ~3 linhas, resto acessível via scroll
-            )
+            for i, row in df.reset_index(drop=True).iterrows():
+                medal = medals[i] if i < len(medals) else "•"
+                st.markdown(
+                    f"{medal} **{row['handle']}** — {row[value_col]} {suffix}"
+                )
 
     rk_col1, rk_col2, rk_col3, rk_col4 = st.columns(4)
 
-    render_ranking_table(
+    render_ranking(
         rk_col1,
         "Mais questões no total",
-        rankings.top_total_solved(unique_solved, n=len(handles)),
+        rankings.top_total_solved(unique_solved),
+        "questões",
         "questões",
     )
 
-    render_ranking_table(
+    render_ranking(
         rk_col2,
         "Mais questões no Codeforces",
-        rankings.top_codeforces_solved(unique_solved, n=len(handles)),
+        rankings.top_codeforces_solved(unique_solved),
+        "questões",
         "questões",
     )
 
-    render_ranking_table(
+    render_ranking(
         rk_col3,
         "Mais questões no CSES",
-        rankings.top_cses_solved(unique_solved, n=len(handles)),
+        rankings.top_cses_solved(unique_solved),
+        "questões",
         "questões",
     )
 
-    render_ranking_table(
+    render_ranking(
         rk_col4,
         "Maior frequência",
-        rankings.top_frequency(subs, unique_solved, n=len(handles)),
+        rankings.top_frequency(subs, unique_solved),
+        "dias",
         "dias",
     )
 
@@ -335,9 +340,6 @@ if mode == "Todos":
         contest_count, on="handle", how="left"
     )
 
-    ranking["rating"] = ranking["rating"].fillna(0).astype(int)
-    ranking["maxRating"] = ranking["maxRating"].fillna(0).astype(int)
-
     # Preencher NaN com 0
     ranking["problems_solved"] = ranking["problems_solved"].fillna(0).astype(int)
     ranking["official_contests"] = ranking["official_contests"].fillna(0).astype(int)
@@ -346,8 +348,23 @@ if mode == "Todos":
     total_months = total_days // 30
     target_contests = max(2, int(total_months * 2))
 
+    # Dias distintos com pelo menos uma submissão (CF + CSES) no período
+    active_days_count = (
+        subs.assign(day=subs["date"].dt.date)
+        .groupby("handle")["day"]
+        .nunique()
+    )
+
+    ranking["active_days"] = (
+        ranking["handle"]
+        .map(active_days_count)
+        .fillna(0)
+        .astype(int)
+    )
+
     max_digits_problems = len(str(ranking["problems_solved"].max()))
     max_digits_contests = len(str(target_contests))
+    max_digits_active_days = len(str(ranking["active_days"].max()))
 
     ranking["problems"] = ranking["problems_solved"].apply(
         lambda x: f"{str(x).rjust(max_digits_problems, "\u2007")}/{total_days}  {codeforces.progress_bar_scaled(x, total_days)}"
@@ -357,17 +374,20 @@ if mode == "Todos":
         lambda x: f"{str(x).rjust(max_digits_contests, "\u2007")}/{target_contests}  {codeforces.progress_bar_scaled(x, target_contests, 2)}"
     )
 
+    ranking["days_active"] = ranking["active_days"].apply(
+        lambda x: f"{str(x).rjust(max_digits_active_days, "\u2007")}/{total_days}  {progress_bar_active_days(x, total_days)}"
+    )
+
     # Ordenar por problemas resolvidos
     ranking = ranking.sort_values(
-        ["problems_solved", "rating"],
+        ["problems_solved", "active_days"],
         ascending=[False, False]
     )[
         [
             "handle",
-            "rating",
-            "maxRating",
             "rank",
             "problems",
+            "days_active",
             "contests",
         ]
     ]
@@ -375,10 +395,9 @@ if mode == "Todos":
     # Renomear para exibição
     ranking = ranking.rename(columns={
         "handle": "Handle",
-        "rating": "Rating",
-        "maxRating": "Max Rating",
         "rank": "Rank",
         "problems": "Problems",
+        "days_active": "Dias Ativos",
         "contests": "Contests"
     })
 

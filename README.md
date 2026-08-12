@@ -61,5 +61,6 @@ Os workflows rodam automaticamente todo dia (cron `0 6 * * *`, ~03h em Manaus) e
 ### Visual
 
 - [x] Mostrar outros rankings (quantidade de questões, plataformas, etc)
+- [ ] Mostrar alguma métrica que incentive o upsolving
 - [ ] Adicionar logos da UFAM, ICOMP, Algox e CPC
 - [ ] Adicionar botão de atalho para o Tucanito Bot.

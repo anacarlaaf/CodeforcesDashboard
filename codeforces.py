@@ -335,8 +335,8 @@ def progress_bar_scaled(
     filled = int(ratio * size)
 
     return (
-        "🟩" * filled
-        + "🟥" * (size - filled)
+        "🟢" * filled
+        + "🔴" * (size - filled)
     )
 
 def progress_bar(done, total):
