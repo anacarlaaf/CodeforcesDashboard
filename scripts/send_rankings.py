@@ -217,62 +217,70 @@ def build_dataset(start: datetime.datetime, end: datetime.datetime):
     return subs, unique_solved
 
 
-def format_top(title: str, df: pd.DataFrame, value_col: str, suffix: str) -> str:
-    """
-    Formata o top 3 sem usar bloco de código.
-    Usa Markdown para negrito.
-    """
-    medals = ["🥇", "🥈", "🥉"]
-
+def format_top(title: str, df: pd.DataFrame, value_col: str, n: int = 5) -> str:
     lines = [f"*{title}*"]
 
     if df.empty:
         lines.append("_sem dados no período_")
         return "\n".join(lines)
 
-    top = df.reset_index(drop=True).head(3)
-
+    top = df.reset_index(drop=True).head(n)
+    
+    # Encontra o maior handle para definir a largura
+    max_handle_len = max(len(str(row["handle"])) for _, row in top.iterrows())
+    # Define largura mínima e adiciona padding
+    handle_width = max(max_handle_len + 2, 10)  # +2 para espaçamento
+    
+    # Encontra o maior valor para alinhar à direita
+    max_value_len = max(len(str(row[value_col])) for _, row in top.iterrows())
+    
+    code_lines = []
+    
     for i, row in top.iterrows():
-        medal = medals[i]
+        pos = f"{i+1}."
         handle = str(row["handle"])
         value = str(row[value_col])
         
-        # Formatação sem bloco de código, usando negrito
-        lines.append(f"{medal} *{handle}* — {value} {suffix}")
+        # Alinhamento: posição à esquerda, handle à esquerda, valor à direita
+        line = f"{pos:<3}{handle:<{handle_width}}{value:>{max_value_len}}"
+        code_lines.append(line)
+    
+    lines.append("```text")
+    lines.extend(code_lines)
+    lines.append("```")
 
     return "\n".join(lines)
-
 
 def build_message(period_label: str, start: datetime.datetime, end: datetime.datetime) -> str:
 
     subs, unique_solved = build_dataset(start, end)
 
     blocks = [
-        "🎈Olá, GCP! Vamos ver como vão os treinos? 🦾🧠",
+        "🎈Olá, GPC! Vamos ver como vão os treinos? 🦾🧠",
         "",
-        f"🏆 *RANKING {period_label.upper()}* 🏆",
+        f"🏆 *RANKING {period_label.upper()}* 🏆\n",
         format_top(
-            "Mais questões no total", 
-            rankings.top_total_solved(unique_solved),
-            "questões", "questões",
+            "Mais questões no total",
+            rankings.top_total_solved(unique_solved, n=5),
+            "questões",
         ),
         "",
         format_top(
             "Mais questões no Codeforces",
-            rankings.top_codeforces_solved(unique_solved),
-            "questões", "questões",
+            rankings.top_codeforces_solved(unique_solved, n=5),
+            "questões",
         ),
         "",
         format_top(
             "Mais questões no CSES",
-            rankings.top_cses_solved(unique_solved),
-            "questões", "questões",
+            rankings.top_cses_solved(unique_solved, n=5),
+            "questões",
         ),
         "",
         format_top(
-            "Maior frequência",
-            rankings.top_frequency(subs, unique_solved),
-            "dias", "dias com submissão",
+            "Dias de estudo",
+            rankings.top_frequency(subs, unique_solved, n=5),
+            "dias",
         ),
     ]
 
