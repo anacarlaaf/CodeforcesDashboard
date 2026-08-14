@@ -468,16 +468,16 @@ def format_daily_stats(total_accepted: int, days_with_submission: int, handle: s
     """Formata as estatísticas diárias para a mensagem"""
     if total_accepted >= 1:
         if total_accepted == 1:
-            msg = f"Legal! Você já resolveu {total_accepted} questão hoje. Que tal fazer mais algumas? ✨"
+            msg = f"Legal! Você já resolveu {total_accepted} problemas hoje. Que tal fazer mais algumas? ✨"
         else:
-            msg = f"Arrasou! Você já resolveu {total_accepted} questões hoje. Duvidei fazer mais uma mais difícil! 🔥"
+            msg = f"Arrasou! Você já resolveu {total_accepted} problemas hoje. Duvidei fazer mais uma mais difícil! 🔥"
         
-        msg += "\n\nLembre-se de resolver pelo menos 1 questão por dia! 🚀"
+        msg += "\n\nLembre-se de resolver pelo menos 1 problema por dia! 🚀"
     
     else:
-        msg = f"Você ainda não nenhuma questão hoje..."
+        msg = f"Você ainda não fez nenhum problema hoje..."
         
-        msg += "\n\nLembre-se de resolver pelo menos 1 questão por dia! 🚀"
+        msg += "\n\nLembre-se de resolver pelo menos 1 problema por dia! 🚀"
 
     return msg
 
@@ -567,8 +567,8 @@ async def check_and_send_reminders(context: ContextTypes.DEFAULT_TYPE):
             # Se o usuário não resolveu nenhuma questão ontem, sugere compensar hoje
             if solved_yesterday == 0:
                 message += (
-                    "😅 Notei que você não resolveu nenhuma questão ontem...\n"
-                    "Que tal aproveitar hoje pra compensar e resolver umas 2 ou mais? 🚀\n\n"
+                    "😅 Notei que você não resolveu nenhum problema ontem...\n"
+                    "Que tal aproveitar hoje pra compensar e resolver 2 ou mais? 🚀\n\n"
                 )
             
             # Envia a mensagem
