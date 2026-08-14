@@ -4,80 +4,31 @@
     "reminders": [
       {
         "days": [
-          "thursday"
-        ],
-        "time": "21:48"
-      },
-      {
-        "days": [
-          "thursday"
-        ],
-        "time": "21:52"
-      },
-      {
-        "days": [
           "monday",
           "tuesday",
           "wednesday",
           "thursday",
-          "friday",
-          "saturday",
-          "sunday"
+          "friday"
         ],
-        "time": "22:00"
+        "time": "05:02"
       },
       {
         "days": [
-          "monday",
-          "tuesday",
-          "wednesday",
-          "thursday",
-          "friday",
-          "saturday",
-          "sunday"
+          "wednesday"
         ],
-        "time": "22:15"
-      },
-      {
-        "days": [
-          "monday",
-          "tuesday",
-          "wednesday",
-          "thursday",
-          "friday",
-          "saturday",
-          "sunday"
-        ],
-        "time": "22:20"
-      },
-      {
-        "days": [
-          "monday",
-          "tuesday",
-          "wednesday",
-          "thursday",
-          "friday",
-          "saturday",
-          "sunday"
-        ],
-        "time": "22:31"
-      },
-      {
-        "days": [
-          "monday",
-          "tuesday",
-          "wednesday",
-          "thursday",
-          "friday",
-          "saturday",
-          "sunday"
-        ],
-        "time": "22:32"
+        "time": "16:37"
       }
     ],
     "last_sent_['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']_22:15": "2026-08-06",
     "last_sent_['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']_22:20": "2026-08-06",
-    "last_sent_['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']_22:31": "2026-08-06"
+    "last_sent_['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']_22:31": "2026-08-06",
+    "last_sent_['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']_22:32": "2026-08-06",
+    "last_sent_['thursday']_23:08": "2026-08-06",
+    "last_sent_['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']_23:10": "2026-08-06",
+    "last_sent_['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']_23:12": "2026-08-06",
+    "last_sent_['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']_23:15": "2026-08-06",
+    "last_sent_['monday', 'tuesday', 'wednesday', 'thursday', 'friday']_05:02": "2026-08-13",
+    "last_sent_['wednesday']_16:37": "2026-08-12"
   },
   "6900800541": {
     "handle": "mariaflachdacosta",
@@ -113,10 +64,30 @@
         "time": "09:00"
       }
     ],
-    "last_sent_['thursday']_09:00": "2026-08-06"
+    "last_sent_['thursday']_09:00": "2026-08-13",
+    "last_sent_['friday']_14:00": "2026-08-07",
+    "last_sent_['monday']_16:00": "2026-08-10",
+    "last_sent_['tuesday']_09:00": "2026-08-11",
+    "last_sent_['wednesday']_16:00": "2026-08-12"
   },
   "1743020723": {
-    "handle": "lip33"
+    "handle": "lip33",
+    "reminders": [
+      {
+        "days": [
+          "monday",
+          "tuesday",
+          "wednesday",
+          "thursday",
+          "friday",
+          "saturday",
+          "sunday"
+        ],
+        "time": "12:00"
+      }
+    ],
+    "last_sent_['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']_17:40": "2026-08-07",
+    "last_sent_['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']_12:00": "2026-08-13"
   },
   "974122280": {
     "handle": "rebecamadi",
@@ -134,9 +105,41 @@
         "time": "15:00"
       }
     ],
-    "last_sent_['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']_15:00": "2026-08-06"
+    "last_sent_['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']_15:00": "2026-08-13"
   },
   "5684039236": {
     "handle": "luanzito"
+  },
+  "6718914542": {
+    "handle": "santwashere"
+  },
+  "6372313729": {
+    "handle": "alexandre.pereira",
+    "reminders": [
+      {
+        "days": [
+          "monday",
+          "tuesday",
+          "wednesday",
+          "thursday",
+          "friday",
+          "saturday",
+          "sunday"
+        ],
+        "time": "16:00"
+      },
+      {
+        "days": [
+          "monday",
+          "tuesday",
+          "wednesday",
+          "thursday",
+          "friday"
+        ],
+        "time": "16:30"
+      }
+    ],
+    "last_sent_['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']_16:00": "2026-08-13",
+    "last_sent_['monday', 'tuesday', 'wednesday', 'thursday', 'friday']_16:30": "2026-08-13"
   }
 }
