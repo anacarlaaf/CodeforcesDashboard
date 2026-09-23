@@ -183,34 +183,76 @@ if st.sidebar.button("🔄 Atualizar dados"):
 
 subs, rating, users = codeforces.load_data(handles=handles)
 
-# Codeforces
-subs["date"] = pd.to_datetime(
-    subs["creationTimeSeconds"],
-    unit="s",
-    utc=True,
-)
+# A API do Codeforces omite rank/rating/maxRating para usuários sem
+# contest rated. Se TODOS os handles forem assim, essas colunas nem
+# existem no DataFrame. Garante as colunas e trata NaN em usuários unrated.
+users = users.copy()
+for col in ("handle", "rank", "rating", "maxRating"):
+    if col not in users.columns:
+        users[col] = float("nan")
 
-rating["date"] = pd.to_datetime(
-    rating["ratingUpdateTimeSeconds"],
-    unit="s",
-    utc=True,
-)
+users["rank"] = users["rank"].fillna("unrated")
+
+# Colunas mínimas que o dashboard usa. Garantidas mesmo quando a API
+# devolve DataFrames vazios (ex: handle sem contest rated / sem submissões),
+# pois um DataFrame vazio criado a partir de lista vazia não tem colunas.
+SUBS_COLUMNS = [
+    "handle", "verdict", "problem.contestId", "problem.index",
+    "problem.rating", "problem.tags", "source", "date",
+]
+RATING_COLUMNS = [
+    "handle", "contestId", "ratingUpdateTimeSeconds", "newRating", "date",
+]
+
+# Codeforces
+if subs is None or subs.empty or "creationTimeSeconds" not in subs.columns:
+    subs = pd.DataFrame(columns=SUBS_COLUMNS)
+else:
+    subs = subs.copy()
+    subs["date"] = pd.to_datetime(
+        subs["creationTimeSeconds"],
+        unit="s",
+        utc=True,
+    )
+
+if rating is None or rating.empty or "ratingUpdateTimeSeconds" not in rating.columns:
+    st.info("Nenhum dado de rating disponível para os handles selecionados.")
+    rating = pd.DataFrame({
+        "handle": pd.Series(dtype="object"),
+        "contestId": pd.Series(dtype="float64"),
+        "ratingUpdateTimeSeconds": pd.Series(dtype="float64"),
+        "newRating": pd.Series(dtype="float64"),
+        "date": pd.Series(dtype="datetime64[ns, UTC]"),
+    })
+else:
+    rating = rating.copy()
+    rating["date"] = pd.to_datetime(
+        rating["ratingUpdateTimeSeconds"], unit="s", utc=True
+    )
 
 # CSES
 cses_subs = cses.load_submissions()
-cses_subs = cses_subs[cses_subs["handle"].isin(handles)]
+if cses_subs is None or "handle" not in cses_subs.columns:
+    cses_subs = pd.DataFrame(columns=["handle", "date", "verdict", "source"])
+
+cses_subs = cses_subs[cses_subs["handle"].isin(handles)].copy()
 cses_subs["problem.rating"] = -1
 
-# juntar CF + CSES — agora ambos já têm date correto
-subs = pd.concat(
-    [subs, cses_subs],
-    ignore_index=True,
-    sort=False,
-)
+# juntar CF + CSES (ignora DataFrames vazios para evitar dtypes bagunçados)
+frames = [f for f in (subs, cses_subs) if not f.empty]
 
-# temporário
-print("CSES no subs logo após concat:")
-print(subs[subs["source"] == "CSES"][["handle","date","verdict"]].groupby("handle").count())
+if frames:
+    subs = pd.concat(frames, ignore_index=True, sort=False)
+else:
+    subs = pd.DataFrame(columns=SUBS_COLUMNS)
+
+# Garante colunas usadas adiante e dtype datetime UTC em "date"
+for col in SUBS_COLUMNS:
+    if col not in subs.columns:
+        subs[col] = pd.NA
+
+subs["date"] = pd.to_datetime(subs["date"], utc=True)
+
 # =============================
 # FILTROS
 # =============================
@@ -221,11 +263,6 @@ subs = subs[
 ]
 
 
-
-print("start:", start)
-print("end:", end)
-print("CSES após filtro:")
-print(subs[subs["source"] == "CSES"][["handle","date"]].tail(10))
 
 rating = rating[
     (rating["date"] >= start)
@@ -682,19 +719,19 @@ elif mode == "Individual":
 
         for _, row in u_solved.iterrows():
 
-            rating = row.get("problem.rating")
+            prob_rating = row.get("problem.rating")
 
             # -------------------------
             # CSES
             # -------------------------
-            if rating == -1:
+            if prob_rating == -1:
                 tag_rows.append({"tag": "CSES"})
                 continue
 
             # -------------------------
             # Gym / Unrated
             # -------------------------
-            if pd.isna(rating) or rating >= 100000:
+            if pd.isna(prob_rating) or prob_rating >= 100000:
                 tag_rows.append({"tag": "Gym/Unrated"})
                 continue
 
@@ -880,10 +917,10 @@ else:
 
     for _, row in team_solved.iterrows():
 
-        rating = row.get("problem.rating")
+        prob_rating = row.get("problem.rating")
 
         # CSES
-        if rating == -1:
+        if prob_rating == -1:
             tag_rows.append({"tag": "CSES"})
             continue
 
