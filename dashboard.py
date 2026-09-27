@@ -172,10 +172,6 @@ if st.sidebar.button("🔄 Atualizar dados"):
             "Cache limpo — Codeforces será buscado ao vivo na próxima consulta.\n\n"
             f"Falha ao iniciar atualização do CSES: {msg_cses}"
         )
-
-    # DEBUG TEMPORÁRIO: comentar st.rerun() por enquanto pra conseguir
-    # ler a mensagem de erro acima sem ela sumir na hora.
-    # st.rerun()
         
 # =============================
 # CARREGAR DADOS

@@ -243,7 +243,7 @@ def fetch_cf_data(handles, submissions_count=2000):
         all_rating.extend(rating)
 
         # evita rate limit
-        time.sleep(0.2)
+        time.sleep(2)
 
     subs_df = pd.json_normalize(all_subs)
     rating_df = pd.json_normalize(all_rating)

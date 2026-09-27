@@ -17,28 +17,59 @@ HEADERS = {
     )
 }
 
-_raw = os.environ.get("CSES_ACCOUNTS")
+_raw = os.environ.get("CSES_ACCOUNT") or os.environ.get("CSES_ACCOUNTS")
 
 if not _raw:
     try:
-        _raw = st.secrets["CSES_ACCOUNTS"]
+        _raw = st.secrets.get("CSES_ACCOUNT") or st.secrets.get("CSES_ACCOUNTS")
     except Exception as e:
-        print("Erro ao carregar CSES_ACCOUNTS:", e)
+        print("Erro ao carregar CSES_ACCOUNT/CSES_ACCOUNTS:", e)
 
 if not _raw:
     raise RuntimeError(
-        "CSES_ACCOUNTS não encontrado. "
+        "CSES_ACCOUNT (ou CSES_ACCOUNTS) não encontrado. "
         "Verifique a variável de ambiente ou .streamlit/secrets.toml."
     )
 
 try:
-    accounts = json.loads(_raw)
+    _parsed = json.loads(_raw)
 except json.JSONDecodeError as e:
     raise RuntimeError(
-        f"CSES_ACCOUNTS contém JSON inválido: {e}"
+        f"CSES_ACCOUNT/CSES_ACCOUNTS contém JSON inválido: {e}"
     )
-    
-accounts = json.loads(_raw)
+
+# -----------------------------------
+# CONTA MESTRE ÚNICA
+# -----------------------------------
+# Antes, cada usuário logava com a própria conta CSES para consultar os
+# próprios dados. Agora usamos UMA ÚNICA conta ("mestre") logada, e essa
+# mesma sessão é usada para consultar os dados de TODOS os usuários — o
+# CSES aceita `user=<nick>` como filtro na URL, não é necessário estar
+# logado como a própria pessoa para ver essas páginas/listas.
+#
+# Formatos aceitos para CSES_ACCOUNT / CSES_ACCOUNTS:
+#   {"user": "minha_conta", "password": "minha_senha"}
+#   [{"user": "minha_conta", "password": "minha_senha"}, ...]  (usa o 1º item)
+
+if isinstance(_parsed, list):
+    if not _parsed:
+        raise RuntimeError("CSES_ACCOUNT/CSES_ACCOUNTS está vazio.")
+    master_account = _parsed[0]
+elif isinstance(_parsed, dict):
+    master_account = _parsed
+else:
+    raise RuntimeError(
+        "CSES_ACCOUNT/CSES_ACCOUNTS em formato inesperado "
+        "(esperado objeto ou lista de objetos)."
+    )
+
+try:
+    MASTER_USER = master_account["user"]
+    MASTER_PASSWORD = master_account["password"]
+except KeyError as e:
+    raise RuntimeError(
+        f"Conta mestre do CSES incompleta, faltando a chave {e}."
+    )
 
 users = pd.read_csv("data/users.csv")
 
@@ -103,75 +134,33 @@ def login_cses(user: str, password: str):
     return session
 
 @st.cache_resource
-def get_cses_sessions():
+def get_cses_session():
     """
-    Retorna:
+    Loga UMA ÚNICA VEZ com a conta mestre e retorna essa sessão.
 
-    {
-        "by_user": {
-            "anacarlaaf": Session(),
-            ...
-        },
-        "all": [
-            Session(),
-            Session(),
-            ...
-        ]
-    }
+    Essa mesma sessão é reaproveitada para consultar os dados de
+    TODOS os usuários (via `user=<nick>` na URL), então não é mais
+    necessário guardar usuário/senha de cada pessoa.
     """
 
-    sessions_by_user = {}
+    try:
 
-    for acc in accounts:
+        session = login_cses(
+            user=MASTER_USER,
+            password=MASTER_PASSWORD,
+        )
 
-        user = acc["user"]
-        password = acc["password"]
-
-        try:
-
-            session = login_cses(
-                user=user,
-                password=password,
-            )
-
-            sessions_by_user[user] = session
-
-        except Exception as e:
-
-            print(
-                f"Erro login {user}: {e}"
-            )
-
-    if len(sessions_by_user) == 0:
+    except Exception as e:
 
         raise RuntimeError(
-            "Nenhuma sessão autenticada."
+            f"Erro ao logar com a conta mestre ({MASTER_USER}): {e}"
         )
 
     print(
-        f"\n✅ {len(sessions_by_user)} sessões autenticadas."
+        f"\n✅ Sessão única autenticada com {MASTER_USER}."
     )
 
-    return {
-        "by_user": sessions_by_user,
-        "all": list(
-            sessions_by_user.values()
-        ),
-    }
-
-def get_rotating_session(
-    sessions,
-    index: int,
-):
-    """
-    Sessão rotativa.
-    """
-
-    pool = sessions["all"]
-
-    return pool[
-        index % len(pool)
-    ]
+    return session
 
 def update_cses_stats(
     html: str,
@@ -313,7 +302,8 @@ def get_solved_tasks_by_user(
         .reset_index(drop=True)
     )
 
-    sessions = get_cses_sessions()
+    # sessão única (conta mestre), usada para consultar todos os usuários
+    session = get_cses_session()
 
     result = {}
 
@@ -333,19 +323,6 @@ def get_solved_tasks_by_user(
         print(
             f"\n[{idx+1}/{total}] USER: {cses_user}"
         )
-
-        # usa a sessão do próprio usuário
-        session = sessions["by_user"].get(cses_user)
-
-        if session is None:
-
-            print(
-                f"SEM SESSÃO PARA {cses_user}"
-            )
-
-            result[cses_user] = []
-
-            continue
 
         url = (
             f"{BASE_URL}/problemset/user/"
@@ -472,17 +449,8 @@ def get_last_accepted_for_codes(
         )
     )
 
-    sessions = get_cses_sessions()
-
-    session = sessions["by_user"].get(user)
-
-    if session is None:
-
-        print(
-            f"Sem sessão para {user}"
-        )
-
-        return pd.DataFrame()
+    # sessão única (conta mestre), usada para consultar todos os usuários
+    session = get_cses_session()
 
     user_code = user_code_map.get(user)
 
