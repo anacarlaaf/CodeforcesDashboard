@@ -1,4 +1,4 @@
-name: Atualizar dados CSES
+name: Atualizar dados (CSES + Codeforces)
 
 on:
   schedule:
@@ -31,3 +31,10 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: python scripts/run_cses_update.py
+
+      - name: Rodar atualização Codeforces
+        env:
+          CODEFORCES_USERS: ${{ secrets.CODEFORCES_USERS }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: python scripts/run_cf_update.py
