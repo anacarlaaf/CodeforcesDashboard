@@ -4,6 +4,7 @@ import plotly.graph_objects as go
 import datetime
 import codeforces
 import cses
+import db
 import rankings
 
 st.set_page_config(
@@ -55,7 +56,7 @@ def progress_bar_active_days(done, total, size=7):
 
 st.title("🎈 Grupo de Programação Competitiva da UFAM")
 
-df = pd.read_csv("data/users.csv")
+df = db.load_members_df()
 
 handles = (
     df["codeforces"]

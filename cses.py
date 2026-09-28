@@ -402,7 +402,7 @@ def get_solved_tasks_by_user(sleep_time: float = 0.1, **_ignored):
 def get_last_accepted_for_codes(
     user: str,
     codes: list[int],
-    problems_csv: str = "data/cses_problems.csv",
+    problems_csv: str = "utils/cses_problems.csv",
     sleep_time: float = 0.2,
     **_ignored,
 ):
