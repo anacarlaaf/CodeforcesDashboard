@@ -6,6 +6,7 @@ prophet
 requests
 datetime
 streamlit>=1.32.0
+supabase
 
 python-telegram-bot>=20.0
 pytz>=2023.3

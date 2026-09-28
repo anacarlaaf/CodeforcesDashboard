@@ -28,12 +28,6 @@ jobs:
       - name: Rodar atualização CSES
         env:
           CSES_ACCOUNTS: ${{ secrets.CSES_ACCOUNTS }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: python scripts/run_cses_update.py
-
-      - name: Commit e push do parquet atualizado
-        run: |
-          git config user.email "actions@github.com"
-          git config user.name "GitHub Actions"
-          git add data/cses_all.parquet
-          git diff --cached --quiet || git commit -m "chore: update cses_all.parquet"
-          git push

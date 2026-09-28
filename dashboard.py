@@ -5,7 +5,6 @@ import datetime
 import codeforces
 import cses
 import rankings
-import requests
 
 st.set_page_config(
     layout="wide",
@@ -49,26 +48,6 @@ def progress_bar_active_days(done, total, size=7):
         "🟢" * filled
         + "⚪" * (size - filled)
     )
-
-def trigger_workflow(workflow_file: str):
-    token = st.secrets.get("GITHUB_TOKEN")
-
-    if not token:
-        return False, "GITHUB_TOKEN não encontrado em st.secrets"
-
-    r = requests.post(
-        f"https://api.github.com/repos/anacarlaaf/CodeforcesDashboard/actions/workflows/{workflow_file}/dispatches",
-        headers={
-            "Authorization": f"Bearer {token}",
-            "Accept": "application/vnd.github+json",
-        },
-        json={"ref": "main"},
-    )
-
-    if r.status_code == 204:
-        return True, "ok"
-
-    return False, f"HTTP {r.status_code} — {r.text}"
 
 # =============================
 # SIDEBAR
@@ -157,26 +136,36 @@ if st.sidebar.button("🔄 Atualizar dados"):
     st.cache_data.clear()
     st.cache_resource.clear()
 
-    # Codeforces não tem mais persistência em parquet: os dados são
-    # sempre buscados ao vivo na API (com cache em memória de 5min).
-    # Limpar o cache acima já força a próxima consulta a buscar de novo.
-    ok_cses, msg_cses = trigger_workflow("update_cses.yml")
+    # Codeforces: limpar o cache acima já força a próxima consulta a
+    # resincronizar o que for novo (ver codeforces.sync_cf_submissions).
+    #
+    # CSES: chamado direto aqui (não mais via GitHub Actions) — o
+    # workflow update_cses.yml continua existindo só pelo cron de
+    # madrugada, como sincronização automática de fundo. Um clique
+    # aqui roda cses.update() na hora, na mesma sessão do Streamlit,
+    # e já grava no Supabase (tabela `submissions`, source='CSES').
+    with st.spinner("Sincronizando CSES..."):
+        try:
+            cses.update(problems_csv="data/cses_problems.csv")
 
-    if ok_cses:
-        st.sidebar.success(
-            "Cache limpo — Codeforces será buscado ao vivo na próxima consulta. "
-            "Atualização do CSES iniciada."
-        )
-    else:
-        st.sidebar.warning(
-            "Cache limpo — Codeforces será buscado ao vivo na próxima consulta.\n\n"
-            f"Falha ao iniciar atualização do CSES: {msg_cses}"
-        )
-        
+            st.sidebar.success(
+                "Cache limpo e CSES sincronizado. "
+                "Codeforces será resincronizado na próxima consulta."
+            )
+
+        except Exception as e:
+            st.sidebar.warning(
+                "Cache limpo — Codeforces será resincronizado na próxima "
+                "consulta.\n\n"
+                f"Falha ao sincronizar CSES: {e}"
+            )
+
 # =============================
 # CARREGAR DADOS
 # =============================
 
+# subs já vem UNIFICADO (Codeforces + CSES juntos, lido da tabela
+# `submissions` no Supabase) — não precisa mais de concat manual.
 subs, rating, users = codeforces.load_data(handles=handles)
 
 # A API do Codeforces omite rank/rating/maxRating para usuários sem
@@ -200,16 +189,16 @@ RATING_COLUMNS = [
     "handle", "contestId", "ratingUpdateTimeSeconds", "newRating", "date",
 ]
 
-# Codeforces
-if subs is None or subs.empty or "creationTimeSeconds" not in subs.columns:
+if subs is None or subs.empty or "date" not in subs.columns:
     subs = pd.DataFrame(columns=SUBS_COLUMNS)
 else:
     subs = subs.copy()
-    subs["date"] = pd.to_datetime(
-        subs["creationTimeSeconds"],
-        unit="s",
-        utc=True,
-    )
+
+    for col in SUBS_COLUMNS:
+        if col not in subs.columns:
+            subs[col] = pd.NA
+
+    subs["date"] = pd.to_datetime(subs["date"], utc=True)
 
 if rating is None or rating.empty or "ratingUpdateTimeSeconds" not in rating.columns:
     st.info("Nenhum dado de rating disponível para os handles selecionados.")
@@ -226,29 +215,6 @@ else:
         rating["ratingUpdateTimeSeconds"], unit="s", utc=True
     )
 
-# CSES
-cses_subs = cses.load_submissions()
-if cses_subs is None or "handle" not in cses_subs.columns:
-    cses_subs = pd.DataFrame(columns=["handle", "date", "verdict", "source"])
-
-cses_subs = cses_subs[cses_subs["handle"].isin(handles)].copy()
-cses_subs["problem.rating"] = -1
-
-# juntar CF + CSES (ignora DataFrames vazios para evitar dtypes bagunçados)
-frames = [f for f in (subs, cses_subs) if not f.empty]
-
-if frames:
-    subs = pd.concat(frames, ignore_index=True, sort=False)
-else:
-    subs = pd.DataFrame(columns=SUBS_COLUMNS)
-
-# Garante colunas usadas adiante e dtype datetime UTC em "date"
-for col in SUBS_COLUMNS:
-    if col not in subs.columns:
-        subs[col] = pd.NA
-
-subs["date"] = pd.to_datetime(subs["date"], utc=True)
-
 # =============================
 # FILTROS
 # =============================
@@ -257,8 +223,6 @@ subs = subs[
     (subs["date"] >= start)
     & (subs["date"] <= end)
 ]
-
-
 
 rating = rating[
     (rating["date"] >= start)
@@ -460,16 +424,21 @@ if mode == "Todos":
     st.subheader("🧩 Problemas resolvidos por usuário (por dificuldade)")
 
     # --- Identificar problemas Gym ---
+    # Antes disso dependia de um valor sentinela (-1) escrito nas
+    # submissões do CSES pra "enganar" essa checagem. Agora que a
+    # tabela unificada tem uma coluna `source` explícita, usamos ela
+    # direto: linhas do CSES nunca contam como gym, independente do
+    # rating (que é sempre NULL pra elas).
     unique_solved["is_gym"] = (
-        unique_solved["problem.rating"].isna() |
-        (unique_solved["problem.rating"] >= 100000)
-    )    
+        (unique_solved["source"] != "CSES")
+        & (
+            unique_solved["problem.rating"].isna()
+            | (unique_solved["problem.rating"] >= 100000)
+        )
+    )
+
     # --- Separar dados ---
-    # Não-gym com rating
-    diff_df = unique_solved[
-        (~unique_solved["is_gym"]) &
-        (~unique_solved["problem.rating"].isna())
-    ].copy()
+    diff_df = unique_solved[~unique_solved["is_gym"]].copy()
 
     # Apenas gym
     gym_df = unique_solved[unique_solved["is_gym"]].copy()
@@ -659,15 +628,18 @@ elif mode == "Individual":
     # padrão = Gym
     diff["difficulty"] = "Gym/Unrated"
 
-    # CSES
+    # CSES — antes checava problem.rating == -1 (sentinela); agora
+    # usa a coluna `source`, que é explícita e não depende de nenhum
+    # valor mágico.
     diff.loc[
-        diff["problem.rating"] == -1,
+        diff["source"] == "CSES",
         "difficulty"
     ] = "CSES"
 
     # Problemas normais CF
     mask_cf = (
-        diff["problem.rating"].notna()
+        (diff["source"] != "CSES")
+        & diff["problem.rating"].notna()
         & (diff["problem.rating"] >= 0)
     )
 
@@ -715,14 +687,15 @@ elif mode == "Individual":
 
         for _, row in u_solved.iterrows():
 
-            prob_rating = row.get("problem.rating")
-
             # -------------------------
-            # CSES
+            # CSES — identificado pela coluna `source`, não mais por
+            # um rating sentinela (-1).
             # -------------------------
-            if prob_rating == -1:
+            if row.get("source") == "CSES":
                 tag_rows.append({"tag": "CSES"})
                 continue
+
+            prob_rating = row.get("problem.rating")
 
             # -------------------------
             # Gym / Unrated
@@ -913,10 +886,9 @@ else:
 
     for _, row in team_solved.iterrows():
 
-        prob_rating = row.get("problem.rating")
-
-        # CSES
-        if prob_rating == -1:
+        # CSES — identificado pela coluna `source`, não mais por um
+        # rating sentinela (-1).
+        if row.get("source") == "CSES":
             tag_rows.append({"tag": "CSES"})
             continue
 

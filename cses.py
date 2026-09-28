@@ -7,6 +7,8 @@ import time
 import json
 import os
 
+import db
+
 BASE_URL = "https://cses.fi"
 
 HEADERS = {
@@ -41,11 +43,9 @@ except json.JSONDecodeError as e:
 # -----------------------------------
 # CONTA MESTRE ÚNICA
 # -----------------------------------
-# Antes, cada usuário logava com a própria conta CSES para consultar os
-# próprios dados. Agora usamos UMA ÚNICA conta ("mestre") logada, e essa
-# mesma sessão é usada para consultar os dados de TODOS os usuários — o
-# CSES aceita `user=<nick>` como filtro na URL, não é necessário estar
-# logado como a própria pessoa para ver essas páginas/listas.
+# Uma única conta ("mestre") logada consulta os dados de TODOS os
+# usuários — o CSES aceita `user=<nick>` como filtro na URL, não
+# precisa estar logado como a própria pessoa pra ver essas páginas.
 #
 # Formatos aceitos para CSES_ACCOUNT / CSES_ACCOUNTS:
 #   {"user": "minha_conta", "password": "minha_senha"}
@@ -71,9 +71,6 @@ except KeyError as e:
         f"Conta mestre do CSES incompleta, faltando a chave {e}."
     )
 
-users = pd.read_csv("data/users.csv")
-
-users_codes = users["cses_code"]
 
 def login_cses(user: str, password: str):
 
@@ -167,8 +164,11 @@ def update_cses_stats(
     csv_file: str = "data/cses_stats.csv"
 ):
     """
-    Extrai user + solved tasks
-    e atualiza/cria um CSV.
+    Extrai user + solved tasks e atualiza/cria um CSV.
+
+    Função independente do fluxo de sincronização de submissões
+    abaixo — usada apenas pra snapshot do ranking geral do CSES, não
+    mexe na tabela `submissions`.
     """
 
     soup = BeautifulSoup(
@@ -177,8 +177,6 @@ def update_cses_stats(
     )
 
     rows = []
-
-    table = soup.find("table", class_=None)
 
     tables = soup.find_all("table")
 
@@ -240,7 +238,6 @@ def update_cses_stats(
 
     path = Path(csv_file)
 
-    # cria arquivo
     if not path.exists():
 
         path.parent.mkdir(
@@ -259,7 +256,6 @@ def update_cses_stats(
 
         return new_df
 
-    # atualiza existente
     old_df = pd.read_csv(path)
 
     merged = old_df.set_index(
@@ -285,17 +281,21 @@ def update_cses_stats(
     return merged.reset_index()
 
 
-def get_solved_tasks_by_user(
-    users_csv: str,
-    sleep_time: float = 0.1,
-):
+def get_solved_tasks_by_user(sleep_time: float = 0.1, **_ignored):
+    """
+    Retorna {cses_user: [problem_codes_resolvidos]} pra todos os
+    membros com cses_user cadastrado. `_ignored` absorve kwargs
+    antigos (ex: users_csv) por compatibilidade, caso algum script
+    externo ainda passe esse argumento.
+    """
 
-    users_df = pd.read_csv(users_csv)
+    users_df = db.load_members_df()
 
     users_df = (
         users_df[
             users_df["cses_user"]
             .fillna("")
+            .astype(str)
             .str.strip()
             .ne("")
         ]
@@ -402,9 +402,9 @@ def get_solved_tasks_by_user(
 def get_last_accepted_for_codes(
     user: str,
     codes: list[int],
-    users_csv: str,
-    problems_csv: str,
+    problems_csv: str = "data/cses_problems.csv",
     sleep_time: float = 0.2,
+    **_ignored,
 ):
     """
     Para cada código em `codes`, consulta:
@@ -415,32 +415,15 @@ def get_last_accepted_for_codes(
         &by=0
         &order=1
 
-    e extrai:
-        - sent at
-        - user
-        - user_code
-        - problem_code
-        - category
+    e extrai a data/hora do accept e a categoria do problema.
 
-    Retorna:
-        DataFrame(
-            user,
-            user_code,
-            problem_code,
-            time,
-            category
-        )
+    Retorna DataFrame(user, problem_code, time, category).
+
+    `_ignored` absorve kwargs antigos (ex: users_csv) por
+    compatibilidade.
     """
 
-    users_df = pd.read_csv(users_csv)
     problems_df = pd.read_csv(problems_csv)
-
-    user_code_map = dict(
-        zip(
-            users_df["cses_user"],
-            users_df["cses_code"],
-        )
-    )
 
     category_map = dict(
         zip(
@@ -451,8 +434,6 @@ def get_last_accepted_for_codes(
 
     # sessão única (conta mestre), usada para consultar todos os usuários
     session = get_cses_session()
-
-    user_code = user_code_map.get(user)
 
     rows = []
 
@@ -534,7 +515,6 @@ def get_last_accepted_for_codes(
             rows.append(
                 {
                     "user": user,
-                    "user_code": user_code,
                     "problem_code": code,
                     "time": accepted_time,
                     "category": category_map.get(
@@ -569,34 +549,20 @@ def get_last_accepted_for_codes(
 
     return df
 
-def get_new_problem_codes(
-    users_csv: str,
-    cses_all_csv: str = "cses_all.parquet",
-):
+def get_new_problem_codes(**_ignored):
     """
-    Retorna apenas os problemas ainda não presentes
-    em cses_all.parquet.
+    Retorna apenas os problemas ainda não presentes na tabela
+    `submissions` (source='CSES') — substitui o diff que antes era
+    feito contra cses_all.parquet.
 
     Retorno:
-
-    {
-        user: [problem_codes_novos]
-    }
+        { cses_user: [problem_codes_novos] }
     """
 
-    solved_tasks = get_solved_tasks_by_user(
-        users_csv=users_csv
-    )
+    solved_tasks = get_solved_tasks_by_user()
 
-    # primeira execução
-    if not Path(cses_all_csv).exists():
-
-        return {
-            user: sorted(codes)
-            for user, codes in solved_tasks.items()
-        }
-
-    df = pd.read_parquet(cses_all_csv)
+    members_df = db.load_members_df()
+    user_to_handle = dict(zip(members_df["cses_user"], members_df["codeforces"]))
 
     result = {}
 
@@ -604,20 +570,19 @@ def get_new_problem_codes(
 
         current_codes = set(current_codes)
 
-        user_df = df.loc[
-            df["user"] == user
-        ]
+        handle = user_to_handle.get(user)
 
-        saved_codes = set(
-            user_df["problem_code"]
-            .dropna()
-            .astype(int)
-            .tolist()
-        )
+        if not handle:
+            print(
+                f"[CSES] {user}: sem handle de Codeforces vinculado "
+                f"em 'members', pulando."
+            )
+            result[user] = []
+            continue
 
-        new_codes = sorted(
-            current_codes - saved_codes
-        )
+        saved_codes = db.get_saved_problem_indices(handle, source="CSES")
+
+        new_codes = sorted(current_codes - saved_codes)
 
         print(
             f"{user}: "
@@ -631,26 +596,41 @@ def get_new_problem_codes(
     return result
 
 
-def update(
-    users_csv: str,
-    problems_csv: str,
-    cses_all_csv: str = "cses_all.parquet",
-):
+def _submitted_at_iso(time_value):
+    ts = pd.Timestamp(time_value)
+
+    if ts.tzinfo is None:
+        ts = ts.tz_localize("UTC")
+    else:
+        ts = ts.tz_convert("UTC")
+
+    return ts.isoformat()
+
+
+def update(problems_csv: str = "data/cses_problems.csv", **_ignored):
     """
-    Atualiza cses_all.parquet apenas com
-    os problemas novos encontrados.
+    Busca só os problemas novos (get_new_problem_codes) e grava na
+    tabela unificada `submissions` (source='CSES').
+
+    `_ignored` absorve kwargs antigos (ex: users_csv, cses_all_csv) —
+    o parquet não é mais usado, tudo vai direto pro Supabase.
     """
 
-    new_problems = get_new_problem_codes(
-        users_csv=users_csv,
-        cses_all_csv=cses_all_csv,
-    )
+    new_problems = get_new_problem_codes()
 
-    dfs = []
+    members_df = db.load_members_df()
+    user_to_handle = dict(zip(members_df["cses_user"], members_df["codeforces"]))
+
+    rows_to_save = []
 
     for user, codes in new_problems.items():
 
-        if len(codes) == 0:
+        if not codes:
+            continue
+
+        handle = user_to_handle.get(user)
+
+        if not handle:
             continue
 
         print(
@@ -661,14 +641,30 @@ def update(
         df_user = get_last_accepted_for_codes(
             user=user,
             codes=codes,
-            users_csv=users_csv,
             problems_csv=problems_csv,
         )
 
-        if not df_user.empty:
-            dfs.append(df_user)
+        if df_user.empty:
+            continue
 
-    if len(dfs) == 0:
+        for _, row in df_user.iterrows():
+
+            category = row.get("category")
+
+            rows_to_save.append({
+                "source": "CSES",
+                "source_id": f"{user}:{row['problem_code']}",
+                "handle": handle,
+                "contest_id": "CSES",
+                "problem_index": str(row["problem_code"]),
+                "problem_rating": None,
+                "problem_tags": [category] if pd.notna(category) else ["CSES"],
+                "verdict": "OK",
+                "submitted_at": _submitted_at_iso(row["time"]),
+                "cf_id": None,
+            })
+
+    if not rows_to_save:
 
         print(
             "Nenhuma atualização necessária."
@@ -676,147 +672,24 @@ def update(
 
         return pd.DataFrame()
 
-    df_new = pd.concat(
-        dfs,
-        ignore_index=True,
-    )
-
-    # primeira execução
-    if not Path(cses_all_csv).exists():
-        df_new["time"] = pd.to_datetime(df_new["time"], utc=True)
-        df_new.to_parquet(
-            cses_all_csv,
-            index=False,
-        )
-
-        print(
-            f"Criado {cses_all_csv}"
-        )
-
-        return df_new
-
-    df_old = pd.read_parquet(
-        cses_all_csv
-    )
-
-    df_new["time"] = pd.to_datetime(df_new["time"], utc=True)
-    df_old["time"] = pd.to_datetime(df_old["time"], utc=True)
-
-    df_final = pd.concat(
-        [df_old, df_new],
-        ignore_index=True,
-    )
-
-    df_final = df_final.drop_duplicates(
-        subset=["user", "problem_code"],
-        keep="last",
-    )
-
-    df_final = df_final.sort_values(
-        ["user", "time"]
-    )
-
-    df_final.to_parquet(
-        cses_all_csv,
-        index=False,
-    )
+    db.save_submissions(rows_to_save)
 
     print(
-        f"Adicionados {len(df_new)} registros."
+        f"Adicionados/atualizados {len(rows_to_save)} registros."
     )
 
-    return df_new
+    return pd.DataFrame(rows_to_save)
 
 @st.cache_data(ttl=3600)
-def sync_cses_data(
-    users_csv="data/users.csv",
-    problems_csv="data/cses_problems.csv",
-    cses_all_csv="data/cses_all.parquet",
-):
+def sync_cses_data(problems_csv: str = "data/cses_problems.csv", **_ignored):
     """
-    Verifica se existem novas soluções no CSES.
-    Se existirem, atualiza cses_all.parquet.
+    Verifica se existem novas soluções no CSES e, se existirem,
+    grava na tabela `submissions`. `_ignored` absorve kwargs antigos
+    (ex: users_csv, cses_all_csv) por compatibilidade.
     """
 
     try:
-        update(
-            users_csv=users_csv,
-            problems_csv=problems_csv,
-            cses_all_csv=cses_all_csv,
-        )
+        update(problems_csv=problems_csv)
 
     except Exception as e:
         print(f"Erro ao sincronizar CSES: {e}")
-
-@st.cache_data(ttl=300)
-def load_submissions(
-    cses_all_csv="data/cses_all.parquet",
-    users_csv="data/users.csv",
-    problems_csv="data/cses_problems.csv",
-):
-    
-    # garante atualização antes de carregar
-    # agora atualiza por fora
-    # sync_cses_data(
-    #     users_csv=users_csv,
-    #     problems_csv=problems_csv,
-    #     cses_all_csv=cses_all_csv,
-    # )
-
-    df = pd.read_parquet(cses_all_csv)
-
-    if df.empty:
-        return pd.DataFrame()
-
-    users = pd.read_csv(users_csv)
-
-    # mapa cses -> codeforces
-    users = users[
-        ["codeforces", "cses_user"]
-    ].dropna(subset=["cses_user"])
-
-    df = df.merge(
-        users,
-        left_on="user",
-        right_on="cses_user",
-        how="left",
-    )
-
-    df["handle"] = df["codeforces"]
-
-    # remover quem não possui handle CF cadastrado
-    df = df.dropna(subset=["handle"])
-    
-    df["date"] = pd.to_datetime(df["time"], utc=True, errors="coerce")
-    print(df[["time","date"]].head())
-    df["problem.contestId"] = "CSES"
-
-    df["problem.index"] = (
-        df["problem_code"]
-        .astype(str)
-    )
-
-    df["problem.rating"] = pd.NA
-
-    df["problem.tags"] = (
-        df["category"]
-        .fillna("CSES")
-        .apply(lambda x: [x])
-    )
-
-    df["verdict"] = "OK"
-
-    df["source"] = "CSES"
-
-    return df[
-        [
-            "handle",
-            "date",
-            "problem.contestId",
-            "problem.index",
-            "problem.rating",
-            "problem.tags",
-            "verdict",
-            "source",
-        ]
-    ]
