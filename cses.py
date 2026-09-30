@@ -161,7 +161,7 @@ def get_cses_session():
 
 def update_cses_stats(
     html: str,
-    csv_file: str = "data/cses_stats.csv"
+    csv_file: str = "utils/cses_stats.csv"
 ):
     """
     Extrai user + solved tasks e atualiza/cria um CSV.
@@ -415,7 +415,7 @@ def get_last_accepted_for_codes(
         &by=0
         &order=1
 
-    e extrai a data/hora do accept e a categoria do problema.
+    e extrai a utils/hora do accept e a categoria do problema.
 
     Retorna DataFrame(user, problem_code, time, category).
 
@@ -607,7 +607,7 @@ def _submitted_at_iso(time_value):
     return ts.isoformat()
 
 
-def update(problems_csv: str = "data/cses_problems.csv", **_ignored):
+def update(problems_csv: str = "utils/cses_problems.csv", **_ignored):
     """
     Busca só os problemas novos (get_new_problem_codes) e grava na
     tabela unificada `submissions` (source='CSES').
@@ -681,7 +681,7 @@ def update(problems_csv: str = "data/cses_problems.csv", **_ignored):
     return pd.DataFrame(rows_to_save)
 
 @st.cache_data(ttl=3600)
-def sync_cses_data(problems_csv: str = "data/cses_problems.csv", **_ignored):
+def sync_cses_data(problems_csv: str = "utils/cses_problems.csv", **_ignored):
     """
     Verifica se existem novas soluções no CSES e, se existirem,
     grava na tabela `submissions`. `_ignored` absorve kwargs antigos

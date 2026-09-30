@@ -145,9 +145,10 @@ if st.sidebar.button("🔄 Atualizar dados"):
     # madrugada, como sincronização automática de fundo. Um clique
     # aqui roda cses.update() na hora, na mesma sessão do Streamlit,
     # e já grava no Supabase (tabela `submissions`, source='CSES').
+    
     with st.spinner("Sincronizando CSES..."):
         try:
-            cses.update(problems_csv="data/cses_problems.csv")
+            cses.update(problems_csv="utils/cses_problems.csv")
 
             st.sidebar.success(
                 "Cache limpo e CSES sincronizado. "
