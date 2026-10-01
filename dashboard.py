@@ -50,6 +50,17 @@ def progress_bar_active_days(done, total, size=7):
         + "⚪" * (size - filled)
     )
 
+@st.cache_data
+def load_cses_problems(path="utils/cses_problems.csv"):
+    """Mapa {task_id: {name, category, url}} dos problemas do CSES."""
+
+    try:
+        df = pd.read_csv(path, dtype={"task_id": str})
+    except FileNotFoundError:
+        return {}
+
+    return df.set_index("task_id")[["name", "category", "url"]].to_dict("index")
+
 # =============================
 # SIDEBAR
 # =============================
@@ -84,6 +95,18 @@ team_default = ["luanzito", "rebecamadi", "lip33"] if len(handles) >= 3 else han
 
 st.sidebar.subheader("📅 Intervalo")
 
+# Os dados ficam em UTC no banco; o fuso escolhido aqui vale para
+# exibição, para os limites do período e para a contagem de dias.
+TIMEZONES = [
+    "America/Manaus",
+    "America/Sao_Paulo",
+    "America/Rio_Branco",
+    "America/Noronha",
+    "UTC",
+]
+
+tz = st.sidebar.selectbox("Fuso horário", TIMEZONES)
+
 preset = st.sidebar.radio(
     "Período rápido",
     [
@@ -94,7 +117,7 @@ preset = st.sidebar.radio(
     ]
 )
 
-today = datetime.datetime.now(datetime.timezone.utc)
+today = pd.Timestamp.now(tz=tz)
 
 if preset == "Última semana":
     start = (today - datetime.timedelta(days=7)).replace(hour=0, minute=0, second=0, microsecond=0)
@@ -111,7 +134,7 @@ elif preset == "Últimos 3 meses":
 else:
     date_range = st.sidebar.date_input(
     "Escolha o intervalo",
-    [today - datetime.timedelta(days=7), today]
+    [(today - datetime.timedelta(days=7)).date(), today.date()]
     )
 
     if isinstance(date_range, tuple) or isinstance(date_range, list):
@@ -128,9 +151,9 @@ else:
     else:
         start_date = end_date = date_range
 
-    start = pd.to_datetime(start_date, utc=True)
+    start = pd.Timestamp(start_date).tz_localize(tz)
 
-    end = pd.to_datetime(end_date, utc=True)
+    end = pd.Timestamp(end_date).tz_localize(tz)
     end = end + pd.Timedelta(days=1) - pd.Timedelta(seconds=1)
 
 if st.sidebar.button("🔄 Atualizar dados"):
@@ -200,7 +223,7 @@ else:
         if col not in subs.columns:
             subs[col] = pd.NA
 
-    subs["date"] = pd.to_datetime(subs["date"], utc=True)
+    subs["date"] = pd.to_datetime(subs["date"], utc=True).dt.tz_convert(tz)
 
 if rating is None or rating.empty or "ratingUpdateTimeSeconds" not in rating.columns:
     st.info("Nenhum dado de rating disponível para os handles selecionados.")
@@ -209,17 +232,21 @@ if rating is None or rating.empty or "ratingUpdateTimeSeconds" not in rating.col
         "contestId": pd.Series(dtype="float64"),
         "ratingUpdateTimeSeconds": pd.Series(dtype="float64"),
         "newRating": pd.Series(dtype="float64"),
-        "date": pd.Series(dtype="datetime64[ns, UTC]"),
+        "date": pd.Series(dtype=f"datetime64[ns, {tz}]"),
     })
 else:
     rating = rating.copy()
     rating["date"] = pd.to_datetime(
         rating["ratingUpdateTimeSeconds"], unit="s", utc=True
-    )
+    ).dt.tz_convert(tz)
 
 # =============================
 # FILTROS
 # =============================
+
+# Histórico completo, sem o filtro de período — usado pra contar os
+# WAs antes de um accept mesmo quando eles caem antes do intervalo.
+all_subs = subs
 
 subs = subs[
     (subs["date"] >= start)
@@ -763,6 +790,192 @@ elif mode == "Individual":
                 }).reset_index(drop=True),
                 width="stretch",
             )
+
+    # =============================
+    # SUBMISSÕES DO USUÁRIO
+    # =============================
+
+    st.subheader("📜 Submissões")
+
+    f_col1, f_col2 = st.columns(2)
+
+    platform_filter = f_col1.multiselect(
+        "Plataforma",
+        ["Codeforces", "CSES"],
+        default=["Codeforces", "CSES"],
+    )
+
+    show_rejected = f_col2.toggle(
+        "Mostrar submissões não aceitas (WA, TLE...)",
+        value=False,
+    )
+
+    # -----------------------------
+    # WAs ATÉ O ACCEPT
+    # -----------------------------
+    # Para cada accept, conta as submissões rejeitadas no mesmo
+    # problema desde o accept anterior (ou desde o início). Usa o
+    # histórico completo, então WAs anteriores ao período também
+    # contam. Compilation error não conta (mesma regra de penalidade
+    # do Codeforces). CSES só guarda accepts, então fica vazio.
+
+    hist = all_subs[
+        (all_subs["handle"] == user)
+        & (all_subs["source"] == "CF")
+    ].sort_values("date")
+
+    problem_key = [
+        hist["problem.contestId"].astype(str),
+        hist["problem.index"].astype(str),
+    ]
+
+    is_ac = hist["verdict"] == "OK"
+    is_fail = ~hist["verdict"].isin(["OK", "COMPILATION_ERROR", "TESTING"])
+
+    # segmento = nº de accepts anteriores no problema; o próprio
+    # accept fica no mesmo segmento das falhas que o precederam
+    segment = is_ac.groupby(problem_key).cumsum() - is_ac
+
+    wa_before = (
+        is_fail
+        .groupby(problem_key + [segment])
+        .transform("sum")
+        [is_ac]
+    )
+
+    table = u_subs.copy()
+
+    if not show_rejected:
+        table = table[table["verdict"] == "OK"]
+
+    table["platform"] = table["source"].map(
+        {"CF": "Codeforces", "CSES": "CSES"}
+    )
+
+    table = table[table["platform"].isin(platform_filter)]
+
+    if table.empty:
+        st.info("Sem submissões no período.")
+    else:
+
+        cf_names = codeforces.get_problem_names()
+        cses_problems = load_cses_problems()
+
+        def problem_details(row):
+            cid = str(row["problem.contestId"])
+            idx = str(row["problem.index"])
+
+            # CSES — nome, categoria e link vêm do CSV de problemas
+            if row["source"] == "CSES":
+                p = cses_problems.get(idx, {})
+                return pd.Series({
+                    "problem_id": f"CSES {idx}",
+                    "name": p.get("name", "-"),
+                    "problem_url": p.get(
+                        "url", f"https://cses.fi/problemset/task/{idx}"
+                    ),
+                })
+
+            # Codeforces — nome salvo no banco (vem do user.status,
+            # cobre gym/mashup); problemset como fallback para linhas
+            # ainda sem backfill. contestId >= 100000 é gym.
+            name = row.get("problem.name")
+
+            if not isinstance(name, str) or not name:
+                name = cf_names.get((cid, idx), "-")
+
+            is_gym = cid.isdigit() and int(cid) >= 100000
+            kind = "gym" if is_gym else "contest"
+
+            return pd.Series({
+                "problem_id": f"{cid}{idx}",
+                "name": name,
+                "problem_url": f"https://codeforces.com/{kind}/{cid}/problem/{idx}",
+            })
+
+        table = pd.concat(
+            [table, table.apply(problem_details, axis=1)],
+            axis=1,
+        )
+
+        table["wa_before"] = table.index.map(wa_before).astype("Int64")
+
+        def difficulty_label(row):
+            if row["source"] == "CSES":
+                return "CSES"
+
+            r = row["problem.rating"]
+
+            if pd.isna(r) or r >= 100000:
+                return "Gym/Unrated"
+
+            return str(int(r))
+
+        table["difficulty"] = table.apply(difficulty_label, axis=1)
+
+        table["topics"] = table["problem.tags"].apply(
+            lambda t: ", ".join(t) if isinstance(t, list) and t else "-"
+        )
+
+        verdict_labels = {
+            "OK": "✅ Aceito",
+            "WRONG_ANSWER": "❌ Wrong Answer",
+            "TIME_LIMIT_EXCEEDED": "⏱️ Time Limit",
+            "MEMORY_LIMIT_EXCEEDED": "💾 Memory Limit",
+            "RUNTIME_ERROR": "💥 Runtime Error",
+            "COMPILATION_ERROR": "🛠️ Compilation Error",
+            "IDLENESS_LIMIT_EXCEEDED": "⏱️ Idleness Limit",
+            "CHALLENGED": "🎯 Hackeado",
+            "SKIPPED": "⏭️ Skipped",
+            "PARTIAL": "◐ Parcial",
+            "TESTING": "⏳ Em teste",
+        }
+
+        table["verdict_label"] = table["verdict"].map(
+            lambda v: verdict_labels.get(v, v)
+        )
+
+        table = table.sort_values("date", ascending=False)
+
+        st.caption(
+            f"{len(table)} submissões · "
+            f"{table.loc[table['verdict'] == 'OK', 'problem_id'].nunique()} problemas distintos aceitos"
+        )
+
+        st.dataframe(
+            table[[
+                "date",
+                "platform",
+                "problem_id",
+                "name",
+                "difficulty",
+                "topics",
+                "verdict_label",
+                "wa_before",
+                "problem_url",
+            ]],
+            hide_index=True,
+            width="stretch",
+            column_config={
+                "date": st.column_config.DatetimeColumn(
+                    "Data", format="DD/MM/YYYY HH:mm"
+                ),
+                "platform": "Plataforma",
+                "problem_id": "ID",
+                "name": "Problema",
+                "difficulty": "Dificuldade",
+                "topics": "Tópicos",
+                "verdict_label": "Veredito",
+                "wa_before": st.column_config.NumberColumn(
+                    "WAs até AC",
+                    help="Submissões rejeitadas no problema antes deste accept "
+                         "(sem contar compilation error)",
+                ),
+                "problem_url": st.column_config.LinkColumn(
+                    "Enunciado", display_text="abrir"
+                ),
+            },
+        )
 # =============================
 # MODO TIME
 # =============================

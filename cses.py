@@ -596,13 +596,23 @@ def get_new_problem_codes(**_ignored):
     return result
 
 
+# A fila de submissões do CSES mostra o horário sem fuso, no horário
+# da Finlândia (servidor) — com horário de verão. Conferido comparando
+# a submissão mais recente da fila com o horário atual.
+CSES_TIMEZONE = "Europe/Helsinki"
+
+
 def _submitted_at_iso(time_value):
     ts = pd.Timestamp(time_value)
 
     if ts.tzinfo is None:
-        ts = ts.tz_localize("UTC")
-    else:
-        ts = ts.tz_convert("UTC")
+        ts = ts.tz_localize(
+            CSES_TIMEZONE,
+            ambiguous=True,
+            nonexistent="shift_forward",
+        )
+
+    ts = ts.tz_convert("UTC")
 
     return ts.isoformat()
 

@@ -19,6 +19,7 @@ Schema esperado (SQL já criado no Supabase):
       handle text not null,
       contest_id text,
       problem_index text,
+      problem_name text,
       problem_rating integer,
       problem_tags text[],
       verdict text not null,
@@ -157,6 +158,7 @@ def load_submissions(handles, source=None) -> pd.DataFrame:
     df = df.rename(columns={
         "contest_id": "problem.contestId",
         "problem_index": "problem.index",
+        "problem_name": "problem.name",
         "problem_rating": "problem.rating",
         "problem_tags": "problem.tags",
         "submitted_at": "date",

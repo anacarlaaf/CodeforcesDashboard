@@ -193,6 +193,7 @@ def _cf_submission_to_row(handle, s):
         "handle": handle,
         "contest_id": str(contest_id) if contest_id is not None else None,
         "problem_index": problem.get("index"),
+        "problem_name": problem.get("name"),
         "problem_rating": problem.get("rating"),
         "problem_tags": problem.get("tags", []),
         "verdict": s.get("verdict"),
@@ -433,6 +434,41 @@ def load_data(
     )
 
     return subs_df, rating_df, users_df
+
+# -----------------------------------
+# NOMES DOS PROBLEMAS
+# -----------------------------------
+
+@st.cache_data(ttl=86400)
+def get_problem_names():
+    """Mapa {(contestId, index): nome} do problemset do Codeforces.
+
+    A tabela `submissions` não guarda o nome do problema, então ele é
+    buscado aqui (endpoint público, sem assinatura). Problemas de gym
+    não aparecem no problemset — nesses casos o dashboard cai no
+    identificador contestId+index."""
+
+    try:
+        r = requests.get(
+            BASE + "problemset.problems",
+            timeout=20,
+        )
+
+        data = r.json()
+
+    except Exception as e:
+
+        print(f"[REQUEST ERROR] problemset.problems | {e}")
+
+        return {}
+
+    if data.get("status") != "OK":
+        return {}
+
+    return {
+        (str(p.get("contestId")), p.get("index")): p.get("name")
+        for p in data["result"]["problems"]
+    }
 
 # -----------------------------------
 # COLORS
