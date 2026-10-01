@@ -35,9 +35,6 @@ if not BOT_TOKEN:
     print("   3. Secrets do Streamlit")
     sys.exit(1)
 
-# Arquivo de dados
-DATA_FILE = Path("data/telegram_users.json")
-
 # Dias da semana em português
 DAYS_PT = {
     "monday": "segunda",

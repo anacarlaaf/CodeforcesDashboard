@@ -5,9 +5,9 @@ Script pra testar a formatação do ranking sem precisar mandar pro grupo.
 Envia a mensagem pra um chat_id específico (o seu, por exemplo), usando
 a mesma lógica de scripts/send_rankings.py.
 
-NÃO recarrega os dados (não roda git pull nem atualização do CSES) —
-usa os parquets/CSVs que já estão na pasta data/ como estão, só pra ver
-a formatação da mensagem rapidamente.
+NÃO sincroniza o CSES — usa o que já está salvo no Supabase, só pra
+ver a formatação da mensagem rapidamente. (O Codeforces é sincronizado
+normalmente pelo codeforces.load_data, como em qualquer leitura.)
 
 Uso:
     python scripts/teste_send_rankings.py --user-id 123456789 --period semanal
@@ -27,6 +27,7 @@ import argparse
 import datetime
 import os
 
+import pandas as pd
 import requests
 
 import send_rankings
@@ -75,11 +76,12 @@ def main():
     )
     args = parser.parse_args()
 
-    # Sem sync: usa os dados locais (data/*.parquet, data/*.csv) como
-    # já estão, só pra visualizar a formatação da mensagem rapidamente.
-    print("[Teste] Usando dados locais, sem recarregar/atualizar nada...")
+    # Sem sync do CSES: usa o que já está no Supabase, só pra visualizar
+    # a formatação da mensagem rapidamente.
+    print("[Teste] Usando dados já salvos, sem sincronizar o CSES...")
 
-    today = datetime.datetime.now(datetime.timezone.utc)
+    # mesmo fuso do ranking real, senão o preview recorta outros dias
+    today = pd.Timestamp.now(tz=send_rankings.RANKING_TIMEZONE)
     end = today.replace(hour=23, minute=59, second=59, microsecond=999999)
 
     if args.period == "semanal":

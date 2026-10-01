@@ -82,19 +82,15 @@ def top_frequency(
     if subs.empty:
         return pd.DataFrame(columns=["handle", "dias"])
 
-    tmp = subs[subs["verdict"] == "OK"].copy()
-
-    if tmp.empty:
-        return pd.DataFrame(columns=["handle", "dias"])
-
-    tmp["day"] = tmp["date"].dt.date
-
-    # Dias distintos com pelo menos uma submissão OK
+    # Dias distintos com pelo menos uma submissão OK, no mesmo fuso em
+    # que as datas de `subs` já estão
     dias = (
-        tmp.groupby("handle")["day"]
-        .nunique()
+        count_active_days(subs, str(subs["date"].dt.tz))
         .reset_index(name="dias")
     )
+
+    if dias.empty:
+        return pd.DataFrame(columns=["handle", "dias"])
 
     # Questões resolvidas no período, para desempate
     if unique_solved is None or unique_solved.empty:
@@ -129,3 +125,86 @@ def top_frequency(
     return result.head(n)[
         ["handle", "dias"]
     ].reset_index(drop=True)
+
+# -----------------------------------
+# DIAS ATIVOS / OFENSIVA
+# -----------------------------------
+#
+# Regra única para dashboard, bot e ranking: um dia é "ativo" quando
+# tem pelo menos uma submissão ACEITA (verdict == "OK"), no Codeforces
+# ou no CSES, contando o dia de calendário no fuso informado. A
+# ofensiva funciona como a do Duolingo: dias ativos consecutivos até
+# hoje. Se hoje ainda não teve accept, a ofensiva de ontem continua
+# valendo (ainda dá tempo de mantê-la); ela só zera quando um dia
+# inteiro passa sem accept.
+
+
+def active_days(subs: pd.DataFrame, tz: str) -> pd.DataFrame:
+    """Pares (handle, day) distintos com pelo menos um accept, com
+    `day` sendo a data local no fuso `tz`."""
+
+    if subs.empty:
+        return pd.DataFrame(columns=["handle", "day"])
+
+    ok = subs[subs["verdict"] == "OK"]
+
+    return (
+        pd.DataFrame({
+            "handle": ok["handle"],
+            "day": pd.to_datetime(ok["date"], utc=True).dt.tz_convert(tz).dt.date,
+        })
+        .drop_duplicates()
+        .reset_index(drop=True)
+    )
+
+
+def count_active_days(subs: pd.DataFrame, tz: str) -> pd.Series:
+    """Quantidade de dias ativos por handle (no período de `subs`)."""
+
+    return active_days(subs, tz).groupby("handle")["day"].nunique()
+
+
+def streaks(subs: pd.DataFrame, tz: str, today=None) -> pd.DataFrame:
+    """
+    Ofensiva por handle, a partir do histórico COMPLETO de submissões
+    (não filtrar por período, senão a ofensiva é cortada no início do
+    intervalo).
+
+    Colunas:
+      - current: ofensiva atual (dias consecutivos até hoje ou ontem)
+      - longest: maior ofensiva já registrada
+      - active_today: se já teve accept hoje
+    """
+
+    if today is None:
+        today = pd.Timestamp.now(tz=tz).date()
+
+    days = active_days(subs, tz)
+    days = days[days["day"] <= today]
+
+    rows = []
+
+    for handle, group in days.groupby("handle"):
+
+        ordinals = sorted(d.toordinal() for d in group["day"])
+
+        longest = run = 1
+
+        for prev, cur in zip(ordinals, ordinals[1:]):
+            run = run + 1 if cur == prev + 1 else 1
+            longest = max(longest, run)
+
+        # `run` agora é a sequência que termina no último dia ativo
+        last = ordinals[-1]
+        gap = today.toordinal() - last
+
+        rows.append({
+            "handle": handle,
+            "current": run if gap <= 1 else 0,
+            "longest": longest,
+            "active_today": gap == 0,
+        })
+
+    return pd.DataFrame(
+        rows, columns=["handle", "current", "longest", "active_today"]
+    ).set_index("handle")

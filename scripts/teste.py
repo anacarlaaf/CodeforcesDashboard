@@ -74,7 +74,7 @@ from bot_config import BOT_TOKEN
 from reminders import ReminderManager
 
 # Reaproveita a mesma lógica de atualização de dados do bot
-from tucanito import run_data_update, MOTIVATIONAL_MESSAGES
+from tucanito import run_data_update, MOTIVATIONAL_MESSAGES, format_daily_stats
 import random
 
 
@@ -96,31 +96,30 @@ async def main():
 
     # 1. Atualiza os dados (mesma função usada pelo job de 10min antes).
     #    Só o CSES precisa de atualização via script — o Codeforces
-    #    sempre é buscado ao vivo na API dentro do get_user_solved_yesterday.
+    #    é sincronizado sob demanda dentro do codeforces.load_data.
     print("\n🔄 Atualizando dados do CSES... isso pode demorar um pouco.")
-    await run_data_update()
+    await run_data_update([user_data.handle])
     print("✅ Dados do CSES atualizados.")
 
-    # 2. Calcula se o usuário zerou ontem
-    solved_yesterday = reminder_manager.get_user_solved_yesterday(
+    # 2. Estatísticas de hoje + ofensiva (mesmas funções do lembrete real)
+    total_accepted, _ = reminder_manager.get_user_stats(
         user_data.handle, user_data.timezone
     )
-    print(f"📊 Questões resolvidas ontem ({user_data.handle}): {solved_yesterday}")
+    streak, longest, active_today = reminder_manager.get_user_streak(
+        user_data.handle, user_data.timezone
+    )
+    print(
+        f"📊 {user_data.handle}: {total_accepted} resolvido(s) hoje · "
+        f"ofensiva {streak} · recorde {longest} · accept hoje: {active_today}"
+    )
 
     # 3. Monta a mensagem (igual ao check_and_send_reminders, mas marcada como teste)
     motivational_msg = random.choice(MOTIVATIONAL_MESSAGES)
     message = (
         f"🧪 [TESTE] 🔥 Bora treinar, {user_data.handle}! 💪\n\n"
         f"{motivational_msg}\n\n"
+        f"{format_daily_stats(total_accepted, streak, longest, active_today)}\n\n"
     )
-
-    if solved_yesterday == 0:
-        message += (
-            "😅 Notei que você não resolveu nenhuma questão ontem...\n"
-            "Que tal aproveitar hoje pra compensar e resolver umas 2 ou mais? 🚀\n\n"
-        )
-    else:
-        message += f"👏 Você resolveu {solved_yesterday} questão(ões) ontem. Bora manter o ritmo!\n\n"
 
     # 4. Envia via Telegram
     bot = Bot(token=BOT_TOKEN)

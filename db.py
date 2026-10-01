@@ -2,7 +2,9 @@
 Camada de acesso ao Supabase compartilhada entre codeforces.py e
 cses.py.
 
-Duas tabelas:
+Três tabelas:
+  - telegram_users: cadastro do bot do Telegram (handle, fuso,
+    lembretes e controle de último envio), uma linha por chat_id.
   - members: cadastro dos membros (handle do Codeforces, usuário do
     CSES, etc).
   - submissions: histórico UNIFICADO de submissões, tanto do
@@ -59,6 +61,7 @@ sb = create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
 
 MEMBERS_TABLE = "members"
 SUBMISSIONS_TABLE = "submissions"
+TELEGRAM_USERS_TABLE = "telegram_users"
 
 PAGE_SIZE = 1000  # limite de linhas por resposta do Supabase
 
@@ -84,6 +87,47 @@ def load_members_df() -> pd.DataFrame:
             df[col] = pd.NA
 
     return df
+
+
+# -----------------------------------
+# TELEGRAM USERS (bot)
+# -----------------------------------
+
+def load_telegram_users() -> dict:
+    """{chat_id: {handle, timezone, reminders, last_sent}} — mesmo
+    formato que o antigo data/telegram_users.json tinha."""
+
+    res = sb.table(TELEGRAM_USERS_TABLE).select(
+        "chat_id, handle, timezone, reminders, last_sent"
+    ).execute()
+
+    return {
+        row["chat_id"]: {
+            "handle": row.get("handle"),
+            "timezone": row.get("timezone"),
+            "reminders": row.get("reminders") or [],
+            "last_sent": row.get("last_sent") or {},
+        }
+        for row in (res.data or [])
+    }
+
+
+def save_telegram_user(chat_id, data, default_timezone):
+    """Upsert de um usuário do bot. `updated_at` só tem default no
+    insert, então é enviado explicitamente."""
+
+    row = {
+        "chat_id": chat_id,
+        "handle": data.get("handle"),
+        "timezone": data.get("timezone") or default_timezone,
+        "reminders": data.get("reminders") or [],
+        "last_sent": data.get("last_sent") or {},
+        "updated_at": pd.Timestamp.now(tz="UTC").isoformat(),
+    }
+
+    sb.table(TELEGRAM_USERS_TABLE).upsert(
+        row, on_conflict="chat_id"
+    ).execute()
 
 
 # -----------------------------------
@@ -233,22 +277,40 @@ def get_last_cf_submission_id(handle):
     return int(value)
 
 
-def get_saved_problem_indices(handle, source):
-    """Conjunto de `problem_index` (como int) já salvos para esse
-    handle+source. Usado pelo cses.py pra descobrir quais problemas
-    resolvidos ainda não estão no banco (substitui o diff que antes
-    era feito contra cses_all.parquet)."""
+def get_saved_cses_problems(handles):
+    """{handle: {problem_index (int)}} dos problemas do CSES já salvos,
+    para vários handles numa consulta só (paginada). Usado pelo
+    cses.sync pra descobrir o que ainda não está no banco."""
 
-    res = (
-        sb.table(SUBMISSIONS_TABLE)
-        .select("problem_index")
-        .eq("handle", handle)
-        .eq("source", source)
-        .execute()
-    )
+    result = {h: set() for h in handles}
 
-    return {
-        int(r["problem_index"])
-        for r in (res.data or [])
-        if r.get("problem_index") is not None
-    }
+    if not handles:
+        return result
+
+    start = 0
+
+    while True:
+
+        res = (
+            sb.table(SUBMISSIONS_TABLE)
+            .select("handle, problem_index")
+            .in_("handle", list(handles))
+            .eq("source", "CSES")
+            .order("handle")
+            .order("problem_index")
+            .range(start, start + PAGE_SIZE - 1)
+            .execute()
+        )
+
+        rows = res.data or []
+
+        for r in rows:
+            if r.get("problem_index") is not None:
+                result.setdefault(r["handle"], set()).add(int(r["problem_index"]))
+
+        if len(rows) < PAGE_SIZE:
+            break
+
+        start += PAGE_SIZE
+
+    return result

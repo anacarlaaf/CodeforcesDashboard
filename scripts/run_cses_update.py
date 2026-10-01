@@ -13,6 +13,4 @@ print(f"SUPABASE_SERVICE_ROLE_KEY len: {len(supabase_key)}")
 
 import cses
 
-cses.update(
-    problems_csv="data/cses_problems.csv",
-)
+cses.update()

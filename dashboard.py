@@ -50,16 +50,21 @@ def progress_bar_active_days(done, total, size=7):
         + "⚪" * (size - filled)
     )
 
-@st.cache_data
-def load_cses_problems(path="utils/cses_problems.csv"):
-    """Mapa {task_id: {name, category, url}} dos problemas do CSES."""
+def streak_label(user_streaks, handle):
+    """Texto da ofensiva para tabelas: 🔥 se já teve accept hoje, ⏳ se
+    ainda pode manter hoje, vazio se zerada."""
 
-    try:
-        df = pd.read_csv(path, dtype={"task_id": str})
-    except FileNotFoundError:
-        return {}
+    if handle not in user_streaks.index:
+        return "0"
 
-    return df.set_index("task_id")[["name", "category", "url"]].to_dict("index")
+    s = user_streaks.loc[handle]
+
+    if s["current"] == 0:
+        return "0"
+
+    icon = "🔥" if s["active_today"] else "⏳"
+
+    return f"{icon} {int(s['current'])}"
 
 # =============================
 # SIDEBAR
@@ -120,7 +125,7 @@ preset = st.sidebar.radio(
 today = pd.Timestamp.now(tz=tz)
 
 if preset == "Última semana":
-    start = (today - datetime.timedelta(days=7)).replace(hour=0, minute=0, second=0, microsecond=0)
+    start = (today - datetime.timedelta(days=6)).replace(hour=0, minute=0, second=0, microsecond=0)
     end = today.replace(hour=23, minute=59, second=59, microsecond=999999)
 
 elif preset == "Último mês":
@@ -134,7 +139,7 @@ elif preset == "Últimos 3 meses":
 else:
     date_range = st.sidebar.date_input(
     "Escolha o intervalo",
-    [(today - datetime.timedelta(days=7)).date(), today.date()]
+    [(today - datetime.timedelta(days=6)).date(), today.date()]
     )
 
     if isinstance(date_range, tuple) or isinstance(date_range, list):
@@ -156,25 +161,24 @@ else:
     end = pd.Timestamp(end_date).tz_localize(tz)
     end = end + pd.Timedelta(days=1) - pd.Timedelta(seconds=1)
 
+# Dias de calendário no período, contando o primeiro e o último
+# (ex: "Última semana" = hoje + 6 dias anteriores = 7 dias)
+period_days = (end.date() - start.date()).days + 1
+
 if st.sidebar.button("🔄 Atualizar dados"):
     st.cache_data.clear()
-    st.cache_resource.clear()
 
     # Codeforces: limpar o cache acima já força a próxima consulta a
     # resincronizar o que for novo (ver codeforces.sync_cf_submissions).
-    #
-    # CSES: chamado direto aqui (não mais via GitHub Actions) — o
-    # workflow update_cses.yml continua existindo só pelo cron de
-    # madrugada, como sincronização automática de fundo. Um clique
-    # aqui roda cses.update() na hora, na mesma sessão do Streamlit,
-    # e já grava no Supabase (tabela `submissions`, source='CSES').
-    
+    # CSES: sincronização completa na hora, ignorando o intervalo
+    # mínimo (ver cses.sync).
+
     with st.spinner("Sincronizando CSES..."):
         try:
-            cses.update(problems_csv="utils/cses_problems.csv")
+            new_cses = cses.update()
 
             st.sidebar.success(
-                "Cache limpo e CSES sincronizado. "
+                f"Cache limpo e CSES sincronizado ({new_cses} problemas novos). "
                 "Codeforces será resincronizado na próxima consulta."
             )
 
@@ -184,6 +188,19 @@ if st.sidebar.button("🔄 Atualizar dados"):
                 "consulta.\n\n"
                 f"Falha ao sincronizar CSES: {e}"
             )
+
+# CSES: sincronização automática, no máximo uma vez a cada
+# cses.SYNC_INTERVAL por usuário — nas outras execuções do script
+# (cada interação no Streamlit) a checagem é só em memória. Se gravou
+# algo novo, o cache de load_data é descartado pra essas linhas
+# aparecerem.
+if cses.needs_sync(handles):
+    with st.spinner("Verificando CSES..."):
+        try:
+            if cses.sync(handles) > 0:
+                codeforces.load_data.clear()
+        except Exception as e:
+            st.sidebar.caption(f"⚠️ CSES não sincronizado: {e}")
 
 # =============================
 # CARREGAR DADOS
@@ -382,22 +399,33 @@ if mode == "Todos":
     ranking["problems_solved"] = ranking["problems_solved"].fillna(0).astype(int)
     ranking["official_contests"] = ranking["official_contests"].fillna(0).astype(int)
 
-    total_days = (end - start).days
+    total_days = period_days
     total_months = total_days // 30
     target_contests = max(2, int(total_months * 2))
 
-    # Dias distintos com pelo menos uma submissão (CF + CSES) no período
-    active_days_count = (
-        subs.assign(day=subs["date"].dt.date)
-        .groupby("handle")["day"]
-        .nunique()
-    )
+    # Dias com pelo menos um accept (CF + CSES) no período — mesma
+    # regra da ofensiva e do ranking do bot (ver rankings.py)
+    active_days_count = rankings.count_active_days(subs, tz)
 
     ranking["active_days"] = (
         ranking["handle"]
         .map(active_days_count)
         .fillna(0)
         .astype(int)
+    )
+
+    # Ofensiva: usa o histórico completo, independente do período
+    user_streaks = rankings.streaks(all_subs, tz)
+
+    ranking["streak"] = (
+        ranking["handle"]
+        .map(user_streaks["current"])
+        .fillna(0)
+        .astype(int)
+    )
+
+    ranking["streak_label"] = ranking["handle"].map(
+        lambda h: streak_label(user_streaks, h)
     )
 
     max_digits_problems = len(str(ranking["problems_solved"].max()))
@@ -426,6 +454,7 @@ if mode == "Todos":
             "rank",
             "problems",
             "days_active",
+            "streak_label",
             "contests",
         ]
     ]
@@ -436,6 +465,7 @@ if mode == "Todos":
         "rank": "Rank",
         "problems": "Problems",
         "days_active": "Dias Ativos",
+        "streak_label": "Ofensiva",
         "contests": "Contests"
     })
 
@@ -624,7 +654,7 @@ elif mode == "Individual":
     # KPIs
     # =============================
 
-    col1, col2, col3, col4 = st.columns(4)
+    col1, col2, col3, col4, col5 = st.columns(5)
 
     col1.metric(
         "🧠 Rating atual",
@@ -637,6 +667,20 @@ elif mode == "Individual":
     )
     col3.metric("🧩 Problemas resolvidos", u_solved.shape[0])
     col4.metric("🏁 Contests", u_rating.shape[0])
+
+    u_streak = rankings.streaks(all_subs[all_subs["handle"] == user], tz)
+
+    if user in u_streak.index:
+        s = u_streak.loc[user]
+        col5.metric(
+            "🔥 Ofensiva",
+            f"{int(s['current'])} {'dia' if s['current'] == 1 else 'dias'}",
+            help=f"Recorde: {int(s['longest'])} {'dia' if s['longest'] == 1 else 'dias'}. "
+                 + ("Já teve accept hoje." if s["active_today"]
+                    else "Ainda sem accept hoje — resolva um problema para manter."),
+        )
+    else:
+        col5.metric("🔥 Ofensiva", "0 dias")
 
     # Dificuldade
     st.subheader("🧠 Distribuição por dificuldade")
@@ -859,7 +903,7 @@ elif mode == "Individual":
     else:
 
         cf_names = codeforces.get_problem_names()
-        cses_problems = load_cses_problems()
+        cses_problems = cses.get_task_catalog()
 
         def problem_details(row):
             cid = str(row["problem.contestId"])
@@ -1049,7 +1093,7 @@ else:
     ranking["problems_solved"] = ranking["problems_solved"].fillna(0).astype(int)
     ranking["official_contests"] = ranking["official_contests"].fillna(0).astype(int)
 
-    total_days = (end - start).days
+    total_days = period_days
     total_months = total_days // 30
     target_contests = max(2, int(total_months * 2))
 

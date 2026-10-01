@@ -11,13 +11,13 @@ import time
 import random
 import logging
 import asyncio
-import subprocess
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes, CallbackQueryHandler
 import pytz
 import codeforces
 import cses
 from reminders import ReminderManager
+import user_stats
 from bot_config import BOT_TOKEN, DAYS_PT, DAYS_EN, DEFAULT_TIMEZONE
 
 # Configuração de logging
@@ -65,6 +65,7 @@ COMMANDS = {
     "list_reminders": "Listar seus lembretes atuais",
     "remove_reminder": "Remover um lembrete",
     "remove_all": "Remover todos os lembretes",
+    "stats": "Ver suas estatísticas (semana, mes ou total)",
     "help": "Mostrar esta mensagem"
 }
 
@@ -134,7 +135,8 @@ def get_help_message() -> str:
         "\n📌 Exemplos:\n"
         "/set_reminder 14:30 - Lembrete diário às 14:30\n"
         "/set_reminder seg,qua,sex 15:00 - Lembrete segunda, quarta e sexta às 15:00\n"
-        "/set_handle anacarlaaf - Redefine seu handle do Codeforces\n\n"
+        "/set_handle anacarlaaf - Redefine seu handle do Codeforces\n"
+        "/stats mes - Suas estatísticas dos últimos 30 dias\n\n"
     )
     
     return message
@@ -398,6 +400,52 @@ async def remove_all(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=reply_markup
     )
 
+async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Estatísticas do usuário: /stats [semana|mes|total] (apenas privado)"""
+    if not private_chat_filter(update):
+        return
+
+    user_id = str(update.effective_user.id)
+    user_data = reminder_manager.get_user(user_id)
+
+    if not user_data or not user_data.handle:
+        await update.message.reply_text(
+            "❌ Você ainda não definiu seu handle do Codeforces.\n"
+            "Use /set_handle seu_handle primeiro."
+        )
+        return
+
+    period = user_stats.parse_period(context.args[0] if context.args else None)
+
+    if period is None:
+        await update.message.reply_text(
+            "❌ Período inválido. Use:\n"
+            "/stats - últimos 7 dias\n"
+            "/stats mes - últimos 30 dias\n"
+            "/stats total - histórico completo"
+        )
+        return
+
+    waiting = await update.message.reply_text("⏳ Calculando suas estatísticas...")
+
+    try:
+        # sincroniza CSES/CF e calcula numa thread, sem travar o bot
+        loop = asyncio.get_running_loop()
+        message = await loop.run_in_executor(
+            None,
+            user_stats.build_stats_message,
+            user_data.handle,
+            user_data.timezone,
+            period,
+        )
+        await waiting.edit_text(message)
+
+    except Exception as e:
+        logger.error(f"❌ Erro no /stats de {user_id} ({user_data.handle}): {e}")
+        await waiting.edit_text(
+            "❌ Não consegui calcular suas estatísticas agora. Tente de novo em instantes."
+        )
+
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Mostra a ajuda (apenas privado)"""
     if not private_chat_filter(update):
@@ -430,8 +478,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     elif data == "remove_all_confirm":
         # Remove todos os lembretes
-        reminder_manager.data[user_id]["reminders"] = []
-        reminder_manager._save_data()
+        reminder_manager.remove_all_reminders(user_id)
         await query.edit_message_text("🗑️ Todos os lembretes foram removidos!")
     
     elif data == "remove_all_cancel":
@@ -464,53 +511,62 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "Use /help para ver todos os comandos disponíveis.\n"
     )
 
-def format_daily_stats(total_accepted: int, days_with_submission: int, handle: str) -> str:
-    """Formata as estatísticas diárias para a mensagem"""
-    if total_accepted >= 1:
-        if total_accepted == 1:
-            msg = f"Legal! Você já resolveu {total_accepted} problemas hoje. Que tal fazer mais algumas? ✨"
-        else:
-            msg = f"Arrasou! Você já resolveu {total_accepted} problemas hoje. Duvidei fazer mais uma mais difícil! 🔥"
-        
-        msg += "\n\nLembre-se de resolver pelo menos 1 problema por dia! 🚀"
-    
+def plural_dias(n: int) -> str:
+    return f"{n} dia" if n == 1 else f"{n} dias"
+
+
+def format_daily_stats(total_accepted: int, streak: int, longest: int, active_today: bool) -> str:
+    """
+    Formata as estatísticas do dia + ofensiva (dias consecutivos com
+    pelo menos um accept, no fuso do usuário — ver rankings.streaks).
+    """
+    if active_today:
+        problemas = "1 problema" if total_accepted == 1 else f"{total_accepted} problemas"
+        msg = (
+            f"🔥 Ofensiva de {plural_dias(streak)}!\n"
+            f"Você já resolveu {problemas} hoje. Que tal mais um, um pouco mais difícil? ✨"
+        )
+
+    elif streak > 0:
+        msg = (
+            f"⏳ Sua ofensiva de {plural_dias(streak)} está em risco!\n"
+            "Você ainda não resolveu nenhum problema hoje — resolva pelo menos 1 para mantê-la. 🚀"
+        )
+
+    elif longest > 0:
+        msg = (
+            f"💔 Sua ofensiva zerou (seu recorde é {plural_dias(longest)}).\n"
+            "Resolva 1 problema hoje para começar uma nova! 🚀"
+        )
+
     else:
-        msg = f"Você ainda não fez nenhum problema hoje..."
-        
-        msg += "\n\nLembre-se de resolver pelo menos 1 problema por dia! 🚀"
+        msg = "Resolva 1 problema hoje para começar sua ofensiva! 🚀"
+
+    if longest > streak and streak > 0:
+        msg += f"\n🏆 Recorde: {plural_dias(longest)}."
 
     return msg
 
-async def run_data_update():
+async def run_data_update(handles=None):
     """
-    Executa o script de atualização de dados do CSES em uma thread
-    separada, para não bloquear o loop de eventos do bot enquanto o
-    scraping acontece.
+    Sincroniza o CSES dos `handles` (None = todos os membros) no próprio
+    processo, numa thread separada pra não bloquear o loop de eventos
+    do bot. A sessão do CSES fica logada entre uma chamada e outra, e
+    usuários sincronizados há pouco são pulados (ver cses.sync).
 
-    O Codeforces NÃO precisa de atualização separada: codeforces.py
-    sempre busca os dados ao vivo na API (sem parquet), com um cache em
-    memória de 5min via @st.cache_data — que já expira sozinho antes do
-    lembrete ser enviado, então a mensagem sempre reflete dados recentes.
+    O Codeforces NÃO precisa de atualização separada: codeforces.load_data
+    sincroniza o que for novo. Mas como load_data guarda o resultado por
+    5min, o cache é descartado quando o CSES grava algo novo — senão o
+    lembrete sairia sem esses problemas.
     """
     loop = asyncio.get_running_loop()
 
     def _run():
-        script = project_root / "scripts" / "run_cses_update.py"
-        if not script.exists():
-            logger.warning(f"⚠️ Script de atualização não encontrado: {script}")
-            return
         try:
-            result = subprocess.run(
-                [sys.executable, str(script)],
-                cwd=project_root,
-                capture_output=True,
-                text=True,
-                timeout=300,
-            )
-            if result.returncode != 0:
-                logger.error(f"❌ Erro ao rodar {script.name}: {result.stderr.strip()}")
+            if cses.sync(handles) > 0:
+                codeforces.load_data.clear()
         except Exception as e:
-            logger.error(f"❌ Falha ao executar {script.name}: {e}")
+            logger.error(f"❌ Falha ao sincronizar CSES: {e}")
 
     await loop.run_in_executor(None, _run)
 
@@ -518,8 +574,8 @@ async def run_data_update():
 async def check_upcoming_reminders(context: ContextTypes.DEFAULT_TYPE):
     """
     Roda a cada minuto. Se algum usuário tem um lembrete disparando em
-    ~10 minutos, atualiza os dados de CF/CSES antes, para que o lembrete
-    já saia com as submissões mais recentes.
+    ~10 minutos, sincroniza o CSES DESSES usuários antes, para que o
+    lembrete já saia com as submissões mais recentes.
     """
     global _last_update_run_key
 
@@ -535,9 +591,14 @@ async def check_upcoming_reminders(context: ContextTypes.DEFAULT_TYPE):
         return
     _last_update_run_key = minute_key
 
-    logger.info(f"🔄 Lembrete chegando em 10min para {len(upcoming)} usuário(s) — atualizando dados do CSES...")
-    await run_data_update()
-    logger.info("✅ Dados do CSES atualizados antes do lembrete.")
+    handles = {
+        reminder_manager.data[user_id]["handle"]
+        for user_id, _ in upcoming
+    }
+
+    logger.info(f"🔄 Lembrete chegando em 10min para {len(handles)} usuário(s) — sincronizando CSES...")
+    await run_data_update(handles)
+    logger.info("✅ CSES sincronizado antes do lembrete.")
 
 
 async def check_and_send_reminders(context: ContextTypes.DEFAULT_TYPE):
@@ -552,24 +613,19 @@ async def check_and_send_reminders(context: ContextTypes.DEFAULT_TYPE):
     for user_id, user_data in reminders:
         try:
             # Busca as estatísticas do usuário
-            total_accepted, days_with_submission = reminder_manager.get_user_stats(user_data.handle, user_data.timezone)
-            solved_yesterday = reminder_manager.get_user_solved_yesterday(user_data.handle, user_data.timezone)
+            total_accepted, _ = reminder_manager.get_user_stats(user_data.handle, user_data.timezone)
+            streak, longest, active_today = reminder_manager.get_user_streak(user_data.handle, user_data.timezone)
 
             motivational_msg = random.choice(MOTIVATIONAL_MESSAGES)
 
-            # Formata a mensagem (SEM Markdown para evitar erros)
+            # Formata a mensagem (SEM Markdown para evitar erros). O
+            # aviso de "não resolveu ontem" agora é coberto pela
+            # ofensiva (zerada ou em risco).
             message = (
                 f"🔥 Bora treinar, {user_data.handle}! 💪\n\n"
                 f"{motivational_msg}\n\n"
-                f"{format_daily_stats(total_accepted, days_with_submission, user_data.handle)}\n\n"
+                f"{format_daily_stats(total_accepted, streak, longest, active_today)}\n\n"
             )
-
-            # Se o usuário não resolveu nenhuma questão ontem, sugere compensar hoje
-            if solved_yesterday == 0:
-                message += (
-                    "😅 Notei que você não resolveu nenhum problema ontem...\n"
-                    "Que tal aproveitar hoje pra compensar e resolver 2 ou mais? 🚀\n\n"
-                )
             
             # Envia a mensagem
             await app.bot.send_message(
@@ -597,6 +653,7 @@ def main():
     application.add_handler(CommandHandler("list_reminders", list_reminders))
     application.add_handler(CommandHandler("remove_reminder", remove_reminder))
     application.add_handler(CommandHandler("remove_all", remove_all))
+    application.add_handler(CommandHandler("stats", stats))
     
     # Callbacks
     application.add_handler(CallbackQueryHandler(handle_callback))

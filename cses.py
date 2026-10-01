@@ -6,6 +6,8 @@ import pandas as pd
 import time
 import json
 import os
+import threading
+from concurrent.futures import ThreadPoolExecutor
 
 import db
 
@@ -130,34 +132,60 @@ def login_cses(user: str, password: str):
 
     return session
 
-@st.cache_resource
-def get_cses_session():
-    """
-    Loga UMA ÚNICA VEZ com a conta mestre e retorna essa sessão.
+# -----------------------------------
+# SESSÃO (conta mestre)
+# -----------------------------------
+# Guardada no módulo (não em st.cache_resource) pra funcionar igual no
+# dashboard, no bot e nos scripts: num processo de longa duração (bot,
+# servidor do Streamlit) o login é feito uma vez só e reaproveitado.
+# Se a sessão expirar, _get_page refaz o login automaticamente.
 
-    Essa mesma sessão é reaproveitada para consultar os dados de
-    TODOS os usuários (via `user=<nick>` na URL), então não é mais
-    necessário guardar usuário/senha de cada pessoa.
-    """
+_session = None
+_session_lock = threading.Lock()
 
-    try:
 
-        session = login_cses(
-            user=MASTER_USER,
-            password=MASTER_PASSWORD,
-        )
+def get_cses_session(force_login: bool = False):
+    """Sessão autenticada com a conta mestre, reaproveitada para
+    consultar os dados de TODOS os usuários (via `user=<nick>` na URL)."""
 
-    except Exception as e:
+    global _session
 
-        raise RuntimeError(
-            f"Erro ao logar com a conta mestre ({MASTER_USER}): {e}"
-        )
+    with _session_lock:
 
-    print(
-        f"\n✅ Sessão única autenticada com {MASTER_USER}."
-    )
+        if _session is None or force_login:
 
-    return session
+            try:
+                _session = login_cses(
+                    user=MASTER_USER,
+                    password=MASTER_PASSWORD,
+                )
+            except Exception as e:
+                raise RuntimeError(
+                    f"Erro ao logar com a conta mestre ({MASTER_USER}): {e}"
+                )
+
+        return _session
+
+
+def _get_page(path: str) -> str:
+    """GET autenticado. As páginas de usuário/fila só trazem dados com
+    login; se a resposta vier sem sessão (expirou), loga de novo uma
+    vez e repete."""
+
+    for attempt in range(2):
+
+        session = get_cses_session(force_login=attempt > 0)
+
+        r = session.get(f"{BASE_URL}{path}", timeout=20)
+
+        if r.status_code == 200 and "/logout" in r.text:
+            return r.text
+
+        if r.status_code not in (200, 401, 403):
+            raise RuntimeError(f"HTTP {r.status_code} em {path}")
+
+    raise RuntimeError(f"Sessão do CSES inválida ao abrir {path}")
+
 
 def update_cses_stats(
     html: str,
@@ -281,319 +309,146 @@ def update_cses_stats(
     return merged.reset_index()
 
 
-def get_solved_tasks_by_user(sleep_time: float = 0.1, **_ignored):
+# -----------------------------------
+# CATÁLOGO DE PROBLEMAS
+# -----------------------------------
+
+CATALOG_TTL = 86400  # 1 dia
+_catalog = None
+_catalog_at = 0.0
+
+
+def _catalog_from_csv(path: str) -> dict:
+    try:
+        df = pd.read_csv(path, dtype={"task_id": str})
+    except FileNotFoundError:
+        return {}
+
+    return df.set_index("task_id")[["name", "category", "url"]].to_dict("index")
+
+
+def get_task_catalog(fallback_csv: str = "utils/cses_problems.csv") -> dict:
     """
-    Retorna {cses_user: [problem_codes_resolvidos]} pra todos os
-    membros com cses_user cadastrado. `_ignored` absorve kwargs
-    antigos (ex: users_csv) por compatibilidade, caso algum script
-    externo ainda passe esse argumento.
-    """
-
-    users_df = db.load_members_df()
-
-    users_df = (
-        users_df[
-            users_df["cses_user"]
-            .fillna("")
-            .astype(str)
-            .str.strip()
-            .ne("")
-        ]
-        .reset_index(drop=True)
-    )
-
-    # sessão única (conta mestre), usada para consultar todos os usuários
-    session = get_cses_session()
-
-    result = {}
-
-    total = len(users_df)
-
-    for idx, row in users_df.iterrows():
-
-        if (
-            pd.isna(row["cses_code"])
-            or pd.isna(row["cses_user"])
-        ):
-            continue
-
-        cses_user = row["cses_user"]
-        cses_code = int(row["cses_code"])
-
-        print(
-            f"\n[{idx+1}/{total}] USER: {cses_user}"
-        )
-
-        url = (
-            f"{BASE_URL}/problemset/user/"
-            f"{cses_code}/"
-        )
-
-        try:
-
-            r = session.get(
-                url,
-                timeout=20,
-            )
-
-            if r.status_code != 200:
-
-                print(
-                    "HTTP ERROR:",
-                    r.status_code
-                )
-
-                result[cses_user] = []
-
-                continue
-
-            soup = BeautifulSoup(
-                r.text,
-                "html.parser"
-            )
-
-            solved = set()
-
-            task_links = soup.select(
-                "a.task-score.icon.full"
-            )
-
-            for link in task_links:
-
-                href = link.get("href", "")
-
-                parts = href.strip("/").split("/")
-
-                if (
-                    len(parts) >= 3
-                    and parts[0] == "problemset"
-                    and parts[1] == "task"
-                ):
-
-                    try:
-
-                        solved.add(
-                            int(parts[2])
-                        )
-
-                    except ValueError:
-                        pass
-
-            solved = sorted(solved)
-
-            result[cses_user] = solved
-
-            print(
-                f"Solved: {len(solved)}"
-            )
-
-        except Exception as e:
-
-            print(
-                f"ERROR {cses_user}: {e}"
-            )
-
-            result[cses_user] = []
-
-        time.sleep(sleep_time)
-
-    return result
-
-def get_last_accepted_for_codes(
-    user: str,
-    codes: list[int],
-    problems_csv: str = "utils/cses_problems.csv",
-    sleep_time: float = 0.2,
-    **_ignored,
-):
-    """
-    Para cada código em `codes`, consulta:
-
-    https://cses.fi/problemset/queue/{code}/1/
-        ?lang=0&status=2
-        &user={user}
-        &by=0
-        &order=1
-
-    e extrai a utils/hora do accept e a categoria do problema.
-
-    Retorna DataFrame(user, problem_code, time, category).
-
-    `_ignored` absorve kwargs antigos (ex: users_csv) por
-    compatibilidade.
+    {task_id: {name, category, url}} de todos os problemas do CSES,
+    lido de /problemset/list/ (uma página só) e guardado por um dia.
+    Assim problemas novos do CSES aparecem com nome e categoria sem
+    precisar atualizar o CSV na mão — o CSV fica só como fallback se o
+    CSES estiver fora do ar (e esse fallback não é guardado em cache,
+    pra tentar o site de novo na próxima chamada).
     """
 
-    problems_df = pd.read_csv(problems_csv)
+    global _catalog, _catalog_at
 
-    category_map = dict(
-        zip(
-            problems_df["task_id"],
-            problems_df["category"],
-        )
-    )
+    if _catalog is not None and time.time() - _catalog_at < CATALOG_TTL:
+        return _catalog
 
-    # sessão única (conta mestre), usada para consultar todos os usuários
-    session = get_cses_session()
+    try:
+        soup = BeautifulSoup(_get_page("/problemset/list/"), "html.parser")
 
-    rows = []
+        catalog = {}
 
-    total = len(codes)
+        for h2 in soup.find_all("h2"):
 
-    for idx, code in enumerate(codes, start=1):
+            ul = h2.find_next_sibling("ul")
 
-        print(
-            f"[{idx}/{total}] "
-            f"{user} - {code}"
-        )
-
-        url = (
-            f"{BASE_URL}/problemset/queue/"
-            f"{code}/1/"
-            f"?lang=0"
-            f"&status=2"
-            f"&user={user}"
-            f"&by=0"
-            f"&order=1"
-        )
-
-        try:
-
-            r = session.get(
-                url,
-                timeout=20,
-            )
-
-            if r.status_code != 200:
-
-                print(
-                    "HTTP ERROR:",
-                    r.status_code,
-                )
-
+            if ul is None or "task-list" not in (ul.get("class") or []):
                 continue
 
-            soup = BeautifulSoup(
-                r.text,
-                "html.parser",
-            )
+            category = h2.get_text(strip=True)
 
-            table = soup.find("table")
-
-            if table is None:
-                continue
-
-            trs = table.find_all("tr")
-
-            accepted_time = None
-
-            for tr in trs:
-
-                tds = tr.find_all("td")
-
-                if len(tds) < 7:
-                    continue
-
-                # coluna:
-                # 2024-04-14 20:45:03
-                accepted_time = (
-                    tds[0]
-                    .get_text(
-                        " ",
-                        strip=True,
-                    )
-                    .replace(
-                        "\xa0",
-                        " ",
-                    )
-                )
-
-                break
-
-            if accepted_time is None:
-                continue
-
-            rows.append(
-                {
-                    "user": user,
-                    "problem_code": code,
-                    "time": accepted_time,
-                    "category": category_map.get(
-                        code
-                    ),
+            for a in ul.select('li.task a[href^="/problemset/task/"]'):
+                task_id = a["href"].strip("/").split("/")[-1]
+                catalog[task_id] = {
+                    "name": a.get_text(strip=True),
+                    "category": category,
+                    "url": f"{BASE_URL}/problemset/task/{task_id}",
                 }
-            )
 
-        except Exception as e:
+        if not catalog:
+            raise RuntimeError("lista de problemas vazia")
 
-            print(
-                f"ERROR {user} {code}: {e}"
-            )
+        _catalog, _catalog_at = catalog, time.time()
 
-        time.sleep(
-            sleep_time
-        )
+        return catalog
 
-    df = pd.DataFrame(rows)
+    except Exception as e:
+        print(f"[CSES] Falha ao ler lista de problemas ({e}), usando {fallback_csv}")
+        return _catalog or _catalog_from_csv(fallback_csv)
 
-    if not df.empty:
 
-        df["time"] = pd.to_datetime(
-            df["time"]
-        )
+# -----------------------------------
+# SCRAPING POR USUÁRIO
+# -----------------------------------
 
-        df = (
-            df
-            .sort_values("time")
-            .reset_index(drop=True)
-        )
-
-    return df
-
-def get_new_problem_codes(**_ignored):
+def fetch_user_tasks(cses_code) -> tuple[set, set]:
     """
-    Retorna apenas os problemas ainda não presentes na tabela
-    `submissions` (source='CSES') — substitui o diff que antes era
-    feito contra cses_all.parquet.
-
-    Retorno:
-        { cses_user: [problem_codes_novos] }
+    (resolvidos, tentados_sem_accept) de um usuário, lidos da página
+    /problemset/user/{code}/ — um request só. Na página, o ícone de
+    cada problema tem a classe `full` (resolvido) ou `zero` (tentou e
+    não passou); sem nenhuma das duas, nunca tentou.
     """
 
-    solved_tasks = get_solved_tasks_by_user()
+    soup = BeautifulSoup(
+        _get_page(f"/problemset/user/{int(cses_code)}/"),
+        "html.parser",
+    )
 
-    members_df = db.load_members_df()
-    user_to_handle = dict(zip(members_df["cses_user"], members_df["codeforces"]))
+    solved, attempted = set(), set()
 
-    result = {}
+    for a in soup.select("a.task-score"):
 
-    for user, current_codes in solved_tasks.items():
+        parts = a.get("href", "").strip("/").split("/")
 
-        current_codes = set(current_codes)
-
-        handle = user_to_handle.get(user)
-
-        if not handle:
-            print(
-                f"[CSES] {user}: sem handle de Codeforces vinculado "
-                f"em 'members', pulando."
-            )
-            result[user] = []
+        if len(parts) < 3 or parts[:2] != ["problemset", "task"]:
             continue
 
-        saved_codes = db.get_saved_problem_indices(handle, source="CSES")
+        try:
+            code = int(parts[2])
+        except ValueError:
+            continue
 
-        new_codes = sorted(current_codes - saved_codes)
+        classes = a.get("class") or []
 
-        print(
-            f"{user}: "
-            f"{len(saved_codes)} salvos | "
-            f"{len(current_codes)} atuais | "
-            f"{len(new_codes)} novos"
-        )
+        if "full" in classes:
+            solved.add(code)
+        elif "zero" in classes:
+            attempted.add(code)
 
-        result[user] = new_codes
+    return solved, attempted
 
-    return result
+
+def fetch_first_accept(cses_user: str, code: int):
+    """
+    Horário (texto, fuso do CSES) do PRIMEIRO accept do usuário no
+    problema, ou None. order=0 = mais antiga primeiro. O filtro
+    `user=` da fila pode casar com outros nicks parecidos, então a
+    linha é conferida pelo nick exato.
+    """
+
+    html = _get_page(
+        f"/problemset/queue/{code}/1/"
+        f"?lang=0&status=2&user={cses_user}&by=0&order=0"
+    )
+
+    table = BeautifulSoup(html, "html.parser").find("table")
+
+    if table is None:
+        return None
+
+    for tr in table.find_all("tr"):
+
+        tds = tr.find_all("td")
+
+        if len(tds) < 7:
+            continue
+
+        if tds[1].get_text(strip=True) != cses_user:
+            continue
+
+        # coluna 0: "2024-04-14 20:45:03"
+        return tds[0].get_text(" ", strip=True).replace("\xa0", " ")
+
+    return None
 
 
 # A fila de submissões do CSES mostra o horário sem fuso, no horário
@@ -617,89 +472,174 @@ def _submitted_at_iso(time_value):
     return ts.isoformat()
 
 
-def update(problems_csv: str = "utils/cses_problems.csv", **_ignored):
+# -----------------------------------
+# SINCRONIZAÇÃO
+# -----------------------------------
+
+# Intervalo mínimo entre duas sincronizações do MESMO usuário. Evita
+# repetir o scraping quando vários lembretes caem no mesmo horário,
+# quando alguém chama /stats várias vezes ou a cada rerun do
+# Streamlit. force=True ignora (botão "Atualizar dados", cron).
+SYNC_INTERVAL = 600  # segundos
+
+# Requests simultâneos ao CSES. Mais que isso arrisca bloqueio da
+# conta mestre.
+MAX_WORKERS = 4
+
+_last_sync = {}  # handle do CF -> time.time() da última sincronização
+_sync_lock = threading.Lock()
+
+
+def needs_sync(handles) -> bool:
+    """True se algum dos handles não é sincronizado há mais de
+    SYNC_INTERVAL. Checagem só em memória (sem banco nem rede), pra
+    quem chama decidir se vale mostrar um "sincronizando..."."""
+
+    now = time.time()
+
+    return any(now - _last_sync.get(h, 0) >= SYNC_INTERVAL for h in handles)
+
+
+def sync(handles=None, force: bool = False) -> int:
     """
-    Busca só os problemas novos (get_new_problem_codes) e grava na
-    tabela unificada `submissions` (source='CSES').
+    Sincroniza o CSES com a tabela `submissions` (source='CSES').
 
-    `_ignored` absorve kwargs antigos (ex: users_csv, cses_all_csv) —
-    o parquet não é mais usado, tudo vai direto pro Supabase.
+    - `handles`: handles do Codeforces (coluna `codeforces` de
+      `members`) a sincronizar; None = todos os membros com CSES.
+    - Usuários sincronizados há menos de SYNC_INTERVAL são pulados,
+      salvo force=True.
+
+    Custo: 1 consulta ao banco + 1 request por usuário + 1 request por
+    problema novo (pra pegar a data do primeiro accept), com até
+    MAX_WORKERS requests em paralelo.
+
+    Retorna quantos problemas novos foram gravados.
     """
 
-    new_problems = get_new_problem_codes()
+    if not force and handles is not None and not needs_sync(handles):
+        return 0
 
-    members_df = db.load_members_df()
-    user_to_handle = dict(zip(members_df["cses_user"], members_df["codeforces"]))
+    members = db.load_members_df()
 
-    rows_to_save = []
+    members = members[
+        members["codeforces"].notna()
+        & members["cses_user"].notna()
+        & members["cses_code"].notna()
+    ].copy()
 
-    for user, codes in new_problems.items():
+    members["codeforces"] = members["codeforces"].astype(str).str.strip()
+    members["cses_user"] = members["cses_user"].astype(str).str.strip()
 
-        if not codes:
+    now = time.time()
+
+    if handles is None:
+        handles = members["codeforces"].tolist()
+
+    handles = set(handles)
+
+    with _sync_lock:
+
+        if not force:
+            handles = {
+                h for h in handles
+                if now - _last_sync.get(h, 0) >= SYNC_INTERVAL
+            }
+
+        # marca antes de começar: outra chamada simultânea (outra
+        # sessão do Streamlit, outro lembrete) não repete o trabalho.
+        # Handles sem CSES também são marcados, pra needs_sync não
+        # ficar pedindo sincronização deles pra sempre.
+        for h in handles:
+            _last_sync[h] = now
+
+    members = members[members["codeforces"].isin(handles)]
+
+    if members.empty:
+        return 0
+
+    saved = db.get_saved_cses_problems(members["codeforces"].tolist())
+
+    users = list(members[["codeforces", "cses_user", "cses_code"]].itertuples(index=False))
+
+    def _user_tasks(m):
+        try:
+            return fetch_user_tasks(m.cses_code)[0]
+        except Exception as e:
+            print(f"[CSES] {m.cses_user}: erro ao ler perfil: {e}")
+            _last_sync.pop(m.codeforces, None)  # tenta de novo na próxima
+            return None
+
+    with ThreadPoolExecutor(MAX_WORKERS) as ex:
+        solved_by_user = list(ex.map(_user_tasks, users))
+
+    pending = []
+
+    for m, solved in zip(users, solved_by_user):
+
+        if solved is None:
             continue
 
-        handle = user_to_handle.get(user)
-
-        if not handle:
-            continue
+        new_codes = sorted(solved - saved.get(m.codeforces, set()))
 
         print(
-            f"{user}: "
-            f"{len(codes)} novos problemas"
+            f"[CSES] {m.cses_user}: {len(solved)} resolvidos | "
+            f"{len(new_codes)} novos"
         )
 
-        df_user = get_last_accepted_for_codes(
-            user=user,
-            codes=codes,
-            problems_csv=problems_csv,
-        )
+        pending.extend((m, code) for code in new_codes)
 
-        if df_user.empty:
+    if not pending:
+        return 0
+
+    def _first_accept(item):
+        m, code = item
+        try:
+            return fetch_first_accept(m.cses_user, code)
+        except Exception as e:
+            print(f"[CSES] {m.cses_user} {code}: erro ao ler fila: {e}")
+            return None
+
+    with ThreadPoolExecutor(MAX_WORKERS) as ex:
+        accepted_times = list(ex.map(_first_accept, pending))
+
+    catalog = get_task_catalog()
+
+    rows = []
+
+    for (m, code), accepted_time in zip(pending, accepted_times):
+
+        if accepted_time is None:
+            # fica de fora e é tentado de novo na próxima sincronização
             continue
 
-        for _, row in df_user.iterrows():
+        task = catalog.get(str(code), {})
+        category = task.get("category")
 
-            category = row.get("category")
+        rows.append({
+            "source": "CSES",
+            "source_id": f"{m.cses_user}:{code}",
+            "handle": m.codeforces,
+            "contest_id": "CSES",
+            "problem_index": str(code),
+            "problem_name": task.get("name"),
+            "problem_rating": None,
+            "problem_tags": [category] if category else ["CSES"],
+            "verdict": "OK",
+            "submitted_at": _submitted_at_iso(accepted_time),
+            "cf_id": None,
+        })
 
-            rows_to_save.append({
-                "source": "CSES",
-                "source_id": f"{user}:{row['problem_code']}",
-                "handle": handle,
-                "contest_id": "CSES",
-                "problem_index": str(row["problem_code"]),
-                "problem_rating": None,
-                "problem_tags": [category] if pd.notna(category) else ["CSES"],
-                "verdict": "OK",
-                "submitted_at": _submitted_at_iso(row["time"]),
-                "cf_id": None,
-            })
+    for i in range(0, len(rows), 500):
+        db.save_submissions(rows[i:i + 500])
 
-    if not rows_to_save:
+    print(f"[CSES] {len(rows)} problemas novos gravados.")
 
-        print(
-            "Nenhuma atualização necessária."
-        )
+    return len(rows)
 
-        return pd.DataFrame()
 
-    db.save_submissions(rows_to_save)
+def update(**_ignored) -> int:
+    """Sincronização completa de todos os membros, ignorando o
+    intervalo mínimo — usada pelo cron, pelo botão "Atualizar dados" e
+    pelo ranking. `_ignored` absorve kwargs antigos (ex: problems_csv)."""
 
-    print(
-        f"Adicionados/atualizados {len(rows_to_save)} registros."
-    )
-
-    return pd.DataFrame(rows_to_save)
-
-@st.cache_data(ttl=3600)
-def sync_cses_data(problems_csv: str = "utils/cses_problems.csv", **_ignored):
-    """
-    Verifica se existem novas soluções no CSES e, se existirem,
-    grava na tabela `submissions`. `_ignored` absorve kwargs antigos
-    (ex: users_csv, cses_all_csv) por compatibilidade.
-    """
-
-    try:
-        update(problems_csv=problems_csv)
-
-    except Exception as e:
-        print(f"Erro ao sincronizar CSES: {e}")
+    return sync(force=True)

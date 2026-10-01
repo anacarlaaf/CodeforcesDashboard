@@ -1,14 +1,14 @@
 # reminders.py (versão corrigida)
-import json
 import datetime
 import pytz
 import pandas as pd
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 from dataclasses import dataclass, asdict
-from bot_config import DATA_FILE, DAYS_PT, DAYS_EN, DEFAULT_TIMEZONE
+from bot_config import DAYS_PT, DAYS_EN, DEFAULT_TIMEZONE
 import codeforces
-import cses
+import db
+import rankings
 
 @dataclass
 class Reminder:
@@ -22,26 +22,23 @@ class UserData:
     timezone: str = DEFAULT_TIMEZONE
 
 class ReminderManager:
+    """
+    Cadastro dos usuários do bot, persistido na tabela `telegram_users`
+    do Supabase (ver db.py). Os dados são carregados uma vez em memória
+    (`self.data`, mesmo formato do antigo data/telegram_users.json) e
+    cada alteração grava só a linha do usuário que mudou.
+    """
+
     def __init__(self):
-        self.data_file = DATA_FILE
         self.data = self._load_data()
-    
+
     def _load_data(self) -> Dict:
-        """Carrega os dados do arquivo JSON"""
-        if not self.data_file.exists():
-            self.data_file.parent.mkdir(parents=True, exist_ok=True)
-            return {}
-        
-        try:
-            with open(self.data_file, 'r', encoding='utf-8') as f:
-                return json.load(f)
-        except:
-            return {}
-    
-    def _save_data(self):
-        """Salva os dados no arquivo JSON"""
-        with open(self.data_file, 'w', encoding='utf-8') as f:
-            json.dump(self.data, f, ensure_ascii=False, indent=2)
+        """Carrega os usuários do Supabase"""
+        return db.load_telegram_users()
+
+    def _save_data(self, user_id: str):
+        """Grava no Supabase os dados de um usuário"""
+        db.save_telegram_user(user_id, self.data[user_id], DEFAULT_TIMEZONE)
     
     def get_user(self, user_id: str) -> Optional[UserData]:
         """Obtém os dados de um usuário"""
@@ -61,7 +58,7 @@ class ReminderManager:
             self.data[user_id] = {}
         
         self.data[user_id]["handle"] = handle
-        self._save_data()
+        self._save_data(user_id)
     
     def set_timezone(self, user_id: str, timezone: str):
         """Define o fuso horário do usuário"""
@@ -69,7 +66,7 @@ class ReminderManager:
             self.data[user_id] = {}
         
         self.data[user_id]["timezone"] = timezone
-        self._save_data()
+        self._save_data(user_id)
     
     def add_reminder(self, user_id: str, days: List[str], time: str) -> bool:
         """Adiciona um lembrete para o usuário"""
@@ -103,7 +100,7 @@ class ReminderManager:
                 return False
         
         self.data[user_id]["reminders"].append(asdict(new_reminder))
-        self._save_data()
+        self._save_data(user_id)
         return True
     
     def remove_reminder(self, user_id: str, index: int) -> bool:
@@ -116,10 +113,18 @@ class ReminderManager:
         
         if 0 <= index < len(self.data[user_id]["reminders"]):
             del self.data[user_id]["reminders"][index]
-            self._save_data()
+            self._save_data(user_id)
             return True
         
         return False
+
+    def remove_all_reminders(self, user_id: str):
+        """Remove todos os lembretes do usuário"""
+        if user_id not in self.data:
+            return
+
+        self.data[user_id]["reminders"] = []
+        self._save_data(user_id)
     
     def get_reminders_for_time(self, current_time_utc: datetime.datetime) -> List[Tuple[str, UserData]]:
         """
@@ -155,14 +160,12 @@ class ReminderManager:
                 if weekday in reminder["days"] and reminder["time"] == time_str:
                     # Verifica se já foi enviado hoje (no fuso do usuário)
                     today = local_now.date()
-                    last_sent_key = f"last_sent_{reminder['days']}_{reminder['time']}"
-                    
-                    if last_sent_key not in data:
-                        data[last_sent_key] = ""
-                    
-                    if data[last_sent_key] != str(today):
-                        data[last_sent_key] = str(today)
-                        self._save_data()
+                    last_sent = data.setdefault("last_sent", {})
+                    last_sent_key = f"{','.join(reminder['days'])}_{reminder['time']}"
+
+                    if last_sent.get(last_sent_key) != str(today):
+                        last_sent[last_sent_key] = str(today)
+                        self._save_data(user_id)
                         
                         # Converte para UserData
                         user_data = UserData(
@@ -206,47 +209,28 @@ class ReminderManager:
         return result
 
     def _load_combined_submissions(self, handle: str) -> pd.DataFrame:
-        """Carrega e combina submissões de Codeforces + CSES para um handle."""
+        """Submissões de Codeforces + CSES de um handle. load_data já
+        devolve as duas fontes juntas (tabela unificada no Supabase)."""
         subs, _, _ = codeforces.load_data(handles=[handle])
 
-        if subs is None or subs.empty:
-            subs = pd.DataFrame(
-                columns=["handle", "date", "verdict", "problem.contestId", "problem.index"]
-            )
-        else:
-            subs = subs.copy()
-            if 'date' not in subs.columns:
-                if 'creationTimeSeconds' in subs.columns:
-                    subs['date'] = pd.to_datetime(subs['creationTimeSeconds'], unit='s', utc=True)
-                else:
-                    subs['date'] = pd.NaT
-
-        try:
-            cses_subs = cses.load_submissions()
-        except Exception:
-            cses_subs = pd.DataFrame()
-
-        if cses_subs is not None and not cses_subs.empty:
-            cses_subs = cses_subs[cses_subs['handle'] == handle].copy()
-        else:
-            cses_subs = pd.DataFrame(
+        if subs is None or subs.empty or 'date' not in subs.columns:
+            return pd.DataFrame(
                 columns=["handle", "date", "verdict", "problem.contestId", "problem.index"]
             )
 
-        all_subs = pd.concat([subs, cses_subs], ignore_index=True, sort=False)
-
-        if all_subs.empty:
-            return all_subs
-
-        all_subs['date'] = pd.to_datetime(all_subs['date'], utc=True)
-        return all_subs
+        subs = subs.copy()
+        subs['date'] = pd.to_datetime(subs['date'], utc=True)
+        return subs
 
     def _count_solved_and_active_days_in_range(
-        self, handle: str, start_utc: datetime.datetime, end_utc: datetime.datetime
+        self, handle: str, start_utc: datetime.datetime, end_utc: datetime.datetime,
+        timezone: str = DEFAULT_TIMEZONE,
     ) -> Tuple[int, int]:
         """
-        Retorna (questoes_unicas_resolvidas, dias_com_submissao) para um
-        handle, considerando apenas submissões no intervalo [start_utc, end_utc].
+        Retorna (questoes_unicas_resolvidas, dias_ativos) para um handle,
+        considerando apenas submissões no intervalo [start_utc, end_utc].
+        Dia ativo = dia (no fuso do usuário) com pelo menos um accept —
+        mesma regra da ofensiva (ver rankings.py).
         """
         all_subs = self._load_combined_submissions(handle)
         if all_subs.empty:
@@ -263,9 +247,9 @@ class ReminderManager:
             ['handle', 'problem.contestId', 'problem.index']
         )
         total_solved = len(unique_solved)
-        days_with_submission = subs_in_range['date'].dt.date.nunique()
+        active_days = int(rankings.count_active_days(subs_in_range, timezone).sum())
 
-        return total_solved, days_with_submission
+        return total_solved, active_days
 
     def get_user_solved_yesterday(self, handle: str, timezone: str) -> int:
         """
@@ -283,7 +267,9 @@ class ReminderManager:
             start_utc = start_local.astimezone(datetime.timezone.utc)
             end_utc = end_local.astimezone(datetime.timezone.utc)
 
-            total_solved, _ = self._count_solved_and_active_days_in_range(handle, start_utc, end_utc)
+            total_solved, _ = self._count_solved_and_active_days_in_range(
+                handle, start_utc, end_utc, timezone
+            )
             return total_solved
 
         except Exception as e:
@@ -313,8 +299,29 @@ class ReminderManager:
             end_utc = now_local.astimezone(datetime.timezone.utc)
             start_utc = start_local.astimezone(datetime.timezone.utc)
 
-            return self._count_solved_and_active_days_in_range(handle, start_utc, end_utc)
+            return self._count_solved_and_active_days_in_range(
+                handle, start_utc, end_utc, timezone
+            )
 
         except Exception as e:
             print(f"Erro ao buscar estatísticas de hoje para {handle}: {e}")
             return 0, 0
+
+    def get_user_streak(self, handle: str, timezone: str = DEFAULT_TIMEZONE) -> Tuple[int, int, bool]:
+        """
+        Retorna (ofensiva_atual, maior_ofensiva, ja_teve_accept_hoje), com
+        os dias contados no fuso do usuário. Ver rankings.streaks.
+        """
+        try:
+            all_subs = self._load_combined_submissions(handle)
+            streak = rankings.streaks(all_subs, timezone)
+
+            if handle not in streak.index:
+                return 0, 0, False
+
+            s = streak.loc[handle]
+            return int(s["current"]), int(s["longest"]), bool(s["active_today"])
+
+        except Exception as e:
+            print(f"Erro ao calcular ofensiva de {handle}: {e}")
+            return 0, 0, False

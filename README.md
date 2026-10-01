@@ -15,23 +15,25 @@ Dashboard em Streamlit para acompanhar o treino de programação competitiva do 
 |---|---|
 | `dashboard.py` | App Streamlit principal (UI, filtros, gráficos) |
 | `codeforces.py` | Integração com a API do Codeforces, leitura/escrita dos parquets de submissões, rating e usuários |
-| `cses.py` | Login e scraping autenticado do CSES, leitura/escrita do parquet de submissões |
-| `rankings.py` | Cálculo dos rankings (total, Codeforces, CSES, frequência) |
+| `cses.py` | Login e scraping autenticado do CSES, sincronização das submissões no Supabase |
+| `rankings.py` | Cálculo dos rankings (total, Codeforces, CSES, frequência), dias ativos e ofensiva |
 | `reminders.py` | Gerenciamento de lembretes e estatísticas por usuário (usado pelo Tucanito) |
 | `bot_config.py` | Configuração do bot (token, timezone, mapeamento de dias) |
 | `tucanito.py` | Bot do Telegram (comandos, lembretes automáticos) |
+| `user_stats.py` | Monta a mensagem do `/stats` do bot (`/stats`, `/stats mes`, `/stats total`) |
 | `send_rankings.py` | Script standalone que monta e envia o ranking periódico no Telegram |
 | `scripts/run_cf_update.py` / `run_cses_update.py` | Entrypoints usados pelos workflows para atualizar os dados |
 | `.github/workflows/update_cf.yml` / `update_cses.yml` | Automação diária (cron) + disparo manual (`workflow_dispatch`) da atualização de dados |
 
 ## Dados
 
-Os dados são persistidos como arquivos `.parquet`/`.csv` no próprio repositório:
+Os dados ficam no Supabase (acesso centralizado em `db.py`):
 
-- `data/users.csv` — cadastro dos membros (handles de Codeforces e CSES)
-- `data/cf_submissions.parquet`, `data/cf_rating.parquet`, `data/cf_users.parquet` — dados do Codeforces
-- `data/cses_all.parquet` — submissões do CSES
-- `data/telegram_users.json` — lembretes e configurações do bot
+- `members` — cadastro dos membros (handles de Codeforces e CSES)
+- `submissions` — submissões do Codeforces e do CSES numa tabela só, diferenciadas pela coluna `source` (`CF`/`CSES`)
+- `telegram_users` — handle, fuso, lembretes e último envio de cada usuário do bot
+
+Rating e informações de perfil do Codeforces são buscados ao vivo na API. A lista de problemas do CSES (nome, categoria, link) fica em `utils/cses_problems.csv`.
 
 ## Secrets necessários
 
