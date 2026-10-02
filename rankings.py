@@ -208,3 +208,23 @@ def streaks(subs: pd.DataFrame, tz: str, today=None) -> pd.DataFrame:
     return pd.DataFrame(
         rows, columns=["handle", "current", "longest", "active_today"]
     ).set_index("handle")
+
+
+def top_streaks(subs: pd.DataFrame, tz: str, n: int = 3) -> pd.DataFrame:
+    """
+    Handles com a maior ofensiva atual. `subs` deve ser o histórico
+    COMPLETO (ver `streaks`). Quem está com ofensiva zerada fica de fora.
+    """
+
+    s = streaks(subs, tz)
+    s = s[s["current"] > 0]
+
+    if s.empty:
+        return pd.DataFrame(columns=["handle", "dias"])
+
+    return (
+        s.sort_values(["current", "longest"], ascending=False)
+        .head(n)["current"]
+        .rename("dias")
+        .reset_index()
+    )

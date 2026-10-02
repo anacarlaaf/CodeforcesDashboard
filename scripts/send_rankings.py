@@ -63,10 +63,10 @@ def build_dataset(start: datetime.datetime, end: datetime.datetime):
                      "problem.contestId", "problem.index"]
         )
 
-    subs = subs.copy()
-    subs["date"] = pd.to_datetime(subs["date"], utc=True).dt.tz_convert(RANKING_TIMEZONE)
+    all_subs = subs.copy()
+    all_subs["date"] = pd.to_datetime(all_subs["date"], utc=True).dt.tz_convert(RANKING_TIMEZONE)
 
-    subs = subs[
+    subs = all_subs[
         (subs["date"] >= start)
         & (subs["date"] <= end)
     ]
@@ -77,7 +77,7 @@ def build_dataset(start: datetime.datetime, end: datetime.datetime):
         ["handle", "problem.contestId", "problem.index"]
     ).copy()
 
-    return subs, unique_solved
+    return all_subs, subs, unique_solved
 
 
 def format_top(title: str, df: pd.DataFrame, value_col: str, n: int = 5) -> str:
@@ -116,7 +116,7 @@ def format_top(title: str, df: pd.DataFrame, value_col: str, n: int = 5) -> str:
 
 def build_message(period_label: str, start: datetime.datetime, end: datetime.datetime) -> str:
 
-    subs, unique_solved = build_dataset(start, end)
+    all_subs, subs, unique_solved = build_dataset(start, end)
 
     blocks = [
         "🎈Olá, GPC! Vamos ver como vão os treinos? 🦾🧠",
@@ -143,6 +143,13 @@ def build_message(period_label: str, start: datetime.datetime, end: datetime.dat
         format_top(
             "Dias de estudo",
             rankings.top_frequency(subs, unique_solved, n=5),
+            "dias",
+        ),
+        "",
+        # Ofensiva usa o histórico completo, independente do período
+        format_top(
+            "Maior ofensiva atual 🔥",
+            rankings.top_streaks(all_subs, RANKING_TIMEZONE, n=5),
             "dias",
         ),
     ]
